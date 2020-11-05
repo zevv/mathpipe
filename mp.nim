@@ -41,17 +41,16 @@ proc newDiff(): Function =
     result = v - vPrev
     vPrev = v
 
+
 const funcTable = {
   "avg": newAvg,
   "min": newMin,
   "max": newMax,
   "int": newInt,
-  "diff": newDiff
+  "diff": newDiff,
 }.toTable()
 
-
-
-var binOps = {
+var opTable = {
   "+": proc(a, b: float): float = a + b,
   "-": proc(a, b: float): float = a - b,
   "*": proc(a, b: float): float = a * b,
@@ -79,11 +78,17 @@ let exprParser = peg(exprs, data: Data):
     let n = parseInt($1)
     data.st.add data.variable[n-1]
 
-  call <- >+Alpha * parenExp:
+  call <- >+Alpha * "(" * args * ")":
     if data.functions.len <= data.callNum:
-      data.functions.add funcTable[$1]()
+      if $1 in funcTable:
+        data.functions.add funcTable[$1]()
+      else:
+        echo "Unknown function ", $1
+        quit 1
     data.st.add data.functions[data.callnum](data.st.pop)
     inc data.callNum
+
+  args <- exp * *( "," * exp)
 
   parenExp <- ( "(" * exp * ")" ) ^ 0
 
@@ -97,11 +102,11 @@ let exprParser = peg(exprs, data: Data):
            >{'^'}        * exp ^^ 3 :
 
     let (f2, f1) = (data.st.pop, data.st.pop)
-    data.st.add binOps[$1](f1, f2)
+    data.st.add opTable[$1](f1, f2)
 
   exp <- S * prefix * *infix * S
 
-  exprs <- exp * *( ',' * S * exp)
+  exprs <- exp * *( ',' * S * exp) * !1
 
 
 
@@ -121,12 +126,18 @@ for l in lines("/dev/stdin"):
   data.st.setlen 0
   data.callNum = 0
 
+  # TODO: AST instead of reparse for every line
+ 
   let r = inputParser.match(l, data)
-  if r.ok:
-    try:
-      let r = exprParser.match(expr, data)
-      if r.ok:
-        echo data.st.mapIt($it).join(", ")
-    except:
-      discard
+
+  try:
+    let r = exprParser.match(expr, data)
+    if r.ok:
+      echo data.st.mapIt($it).join(", ")
+    else:
+      echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
+      quit 1
+  except:
+    echo "booo"
+    discard
 
