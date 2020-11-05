@@ -13,8 +13,6 @@ type
     BiquadHighPass,
     BiquadBandPass,
     BiquadBandStop,
-    BiquadLowShelf,
-    BiquadHighShelf,
 
   Biquad* = object
     kind: BiquadKind
@@ -25,9 +23,7 @@ type
     y0, y1, y2: float
     b0_a0, b1_a0, b2_a0: float
     a1_a0, a2_a0: float
-    initialized: bool
     first: bool
-
 
 
 proc config*(bq: var Biquad, kind: BiquadKind, freq: float, Q: float) =
@@ -78,35 +74,12 @@ proc config*(bq: var Biquad, kind: BiquadKind, freq: float, Q: float) =
       a1 = -2.0 * cos_w0
       a2 = 1.0 - alpha
 
-    of BiquadLowShelf:    
-      discard
-      # b0 =    A*[ (A+1) - (A-1)*cos + beta*sin ]
-      # b1 =  2*A*[ (A-1) - (A+1)*cos            ]
-      # b2 =    A*[ (A+1) - (A-1)*cos - beta*sin ]
-      # a0 =        (A+1) + (A-1)*cos + beta*sin
-      # a1 =   -2*[ (A-1) + (A+1)*cos            ]
-      # a2 =        (A+1) + (A-1)*cos - beta*sin
-
-    of BiquadHighShelf: 
-      discard
-      # b0 =    A*[ (A+1) + (A-1)*cos + beta*sin ]
-      # b1 = -2*A*[ (A-1) + (A+1)*cos            ]
-      # b2 =    A*[ (A+1) + (A-1)*cos - beta*sin ]
-      # a0 =        (A+1) - (A-1)*cos + beta*sin
-      # a1 =    2*[ (A-1) - (A+1)*cos            ]
-      # a2 =        (A+1) - (A-1)*cos - beta*sin
-
   let a0r = 1.0 / a0
   bq.b0_a0 = b0 * a0r
   bq.b1_a0 = b1 * a0r
   bq.b2_a0 = b2 * a0r
   bq.a1_a0 = a1 * a0r
   bq.a2_a0 = a2 * a0r
-  bq.initialized = true
-
-
-proc setFreq*(bq: var Biquad, freq: float) =
-  bq.config(bq.kind, freq, bq.Q)
 
 
 proc initBiquad*(kind=BiquadLowpass, freq=0.5, Q=0.707): Biquad =
