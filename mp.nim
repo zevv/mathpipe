@@ -6,6 +6,8 @@ import math
 import os
 import sequtils
 
+import biquad
+
 type
   Function = proc(val: float): float
 
@@ -41,6 +43,11 @@ proc newDiff(): Function =
     result = v - vPrev
     vPrev = v
 
+proc newLp(): Function =
+  var biquad = initBiquad(BiquadLowpass, 0.1)
+  return proc(v: float): float =
+    biquad.run(v)
+
 
 const funcTable = {
   "avg": newAvg,
@@ -48,7 +55,9 @@ const funcTable = {
   "max": newMax,
   "int": newInt,
   "diff": newDiff,
+  "lp": newLp,
 }.toTable()
+
 
 var opTable = {
   "+": proc(a, b: float): float = a + b,
@@ -88,7 +97,7 @@ let exprParser = peg(exprs, data: Data):
     data.st.add data.functions[data.callnum](data.st.pop)
     inc data.callNum
 
-  args <- exp * *( "," * exp)
+  args <- exp
 
   parenExp <- ( "(" * exp * ")" ) ^ 0
 
