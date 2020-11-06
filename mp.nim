@@ -12,12 +12,10 @@ import biquad
 import misc
 
 type
-  Function = proc(val: float): float
-
-  Operator = proc(a, b: float): float
+  Function = proc(val: openArray[float]): float
 
   NodeKind = enum
-    nkConst, nkVar, nkCall, nkOp
+    nkConst, nkVar, nkCall
 
   Node = ref object
     case kind: NodeKind
@@ -27,8 +25,6 @@ type
       varIdx: int
     of nkCall:
       fn: Function
-    of nkOp:
-      op: Operator
     else:
       discard
     s: string
@@ -36,76 +32,77 @@ type
 
 proc newAvg(): Function =
   var vTot, n: float
-  return proc(v: float): float =
-    vTot += v
+  return proc(vs: openArray[float]): float =
+    vTot += vs[0]
     n += 1
     vTot / n
 
 proc newMin(): Function =
   var vMin = float.high
-  return proc(v: float): float =
-    vMin = min(vMin, v)
+  return proc(vs: openArray[float]): float =
+    vMin = min(vMin, vs[0])
     vMin
 
 proc newMax(): Function =
   var vMax = float.low
-  return proc(v: float): float =
-    vMax = max(vMax, v)
+  return proc(vs: openArray[float]): float =
+    vMax = max(vMax, vs[0])
     vMax
 
 proc newIntegrate(): Function =
   var vTot: float
-  return proc(v: float): float =
-    vTot += v
-    v
+  return proc(vs: openArray[float]): float =
+    vTot += vs[0]
+    vs[0]
 
 proc newDiff(): Function =
   var vPrev: float
-  return proc(v: float): float =
-    result = v - vPrev
-    vPrev = v
+  return proc(vs: openArray[float]): float =
+    result = vs[0] - vPrev
+    vPrev = vs[0]
 
 proc newLog(): Function =
-  return proc(v: float): float =
-    ln(v)
+  return proc(vs: openArray[float]): float =
+    ln(vs[0])
 
 proc newLowpass(): Function =
   var biquad = initBiquad(BiquadLowpass, 0.1)
-  return proc(v: float): float =
-    biquad.run(v)
+  return proc(vs: openArray[float]): float =
+    echo len(vs)
+    biquad.run(vs[0])
 
 proc newVariance(): Function =
   # Rolling variance deviation using Welford's algorithm
   var n, mOld, mNew, sOld, sNew: float
-  return proc(v: float): float =
+  return proc(vs: openArray[float]): float =
     n += 1
     if n == 1:
-      mOld = v
-      mNew = v
+      mOld = vs[0]
+      mNew = vs[0]
       result = 0
     else:
-      mNew = mOld + (v - mOld) / n
-      sNew = sOld + (v - mOld) * (v - mNew)
+      mNew = mOld + (vs[0] - mOld) / n
+      sNew = sOld + (vs[0] - mOld) * (vs[0] - mNew)
       mOld = mNew
       sOld = sNew
       result = sNew / (n - 1)
 
 proc newStddev(): Function =
   let fnVariance = newVariance()
-  return proc(v: float): float =
-    sqrt(fnVariance(v))
+  return proc(vs: openArray[float]): float =
+    sqrt(fnVariance(vs))
 
 proc newStddev2(): Function =
   var rs: RunningStat
-  return proc(v: float): float =
-    rs.push(v)
+  return proc(vs: openArray[float]): float =
+    rs.push(vs[0])
     return rs.standardDeviation()
 
 proc newHistogram(): Function =
   var vals: seq[float]
-  return proc(v: float): float =
-    result = v
-    vals.add v
+  return proc(vs: openArray[float]): float =
+    result = vs[0]
+    vals.add vs[0]
     drawHistogram(vals)
 
 
@@ -127,12 +124,12 @@ const funcTable = {
 # Operator primitives
 
 var opTable = {
-  "+": proc(a, b: float): float = a + b,
-  "-": proc(a, b: float): float = a - b,
-  "*": proc(a, b: float): float = a * b,
-  "/": proc(a, b: float): float = a / b,
-  "%": proc(a, b: float): float = a mod b,
-  "^": proc(a, b: float): float = pow(a, b),
+  "+": proc(vs: openArray[float]): float = vs[0] + vs[1],
+  "-": proc(vs: openArray[float]): float = vs[0] - vs[1],
+  "*": proc(vs: openArray[float]): float = vs[0] * vs[1],
+  "/": proc(vs: openArray[float]): float = vs[0] / vs[1],
+  "%": proc(vs: openArray[float]): float = vs[0] mod vs[1],
+  "^": proc(vs: openArray[float]): float = pow(vs[0], vs[1]),
 }.toTable()
 
 
@@ -161,13 +158,13 @@ let exprParser1 = peg(exprs, st: seq[Node]):
     let a = st.pop
     st.add Node(kind: nkCall, s: $1, fn: funcTable[$1](), kids: @[a])
 
-  args <- exp
+  args <- exp * *( "," * S * exp)
 
   parenExp <- ( "(" * exp * ")" ) ^ 0
 
   uniMinus <- '-' * exp:
     let a = st.pop
-    proc neg(v: float): float = -v
+    proc neg(vs: openArray[float]): float = -vs[0]
     st.add Node(kind: nkCall, s: "-", fn: neg, kids: @[a])
 
   prefix <- variable | number | call | parenExp | uniMinus
@@ -177,7 +174,7 @@ let exprParser1 = peg(exprs, st: seq[Node]):
            >{'^'}         * exp ^^ 3 :
 
     let (a2, a1) = (st.pop, st.pop)
-    st.add Node(kind: nkOp, s: $1, op: opTable[$1], kids: @[a1, a2])
+    st.add Node(kind: nkCall, s: $1, fn: opTable[$1], kids: @[a1, a2])
 
   exp <- S * prefix * *infix * S
 
@@ -198,8 +195,7 @@ proc eval(root: Node, args: seq[float]): float =
     case n.kind
     of nkConst: n.val
     of nkVar:   args[n.varIdx-1]
-    of nkCall:  n.fn(aux(n.kids[0]))
-    of nkOp:    n.op(aux(n.kids[0]), aux(n.kids[1]))
+    of nkCall:  n.fn(n.kids.map(aux))
 
   result = aux(root)
 
