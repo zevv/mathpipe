@@ -36,6 +36,8 @@ proc siFmt*(v: SomeNumber, align=false): string =
    
 proc drawHistogram*(vals: openArray[float]) =
 
+  if vals.len <= 1:
+    return
 
   let
     w = terminalWidth() - 10
