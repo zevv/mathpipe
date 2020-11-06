@@ -21,12 +21,10 @@ type
   FuncDesc = object
     name: string
     args: string
-    factory: FuncFactory
+    factory: proc(): Func
 
   Func = proc(val: openArray[float]): float
 
-  FuncFactory = proc(): Func
-  
   NodeKind = enum
     nkConst, nkVar, nkCall
 
