@@ -1,5 +1,5 @@
 
-mp: mp.nim misc.nim biquad.nim
+mp: mp.nim histogram.nim biquad.nim
 	nim c mp.nim
 
 clean:

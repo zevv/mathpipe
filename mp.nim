@@ -10,7 +10,7 @@ import stats
 import strutils
 
 import biquad
-import misc
+import histogram
 
 const
 
@@ -203,7 +203,7 @@ proc eval(root: Node, args: seq[float]): float =
   proc aux(n: Node): float =
     case n.kind
     of nkConst: n.val
-    of nkVar: args[n.varIdx-1]
+    of nkVar:args[n.varIdx-1]
     of nkCall: n.fn(n.kids.map(aux))
   result = aux(root)
 
@@ -231,7 +231,7 @@ const exprParser = peg(exprs, st: seq[Node]):
   number <- >numbers.number:
     st.add Node(kind: nkConst, val: parseNumber($1))
 
-  variable <- '$' * >+Digit:
+  variable <- {'$','%'} * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
   call <- functionName * ( "(" * args * ")" | args)
@@ -283,12 +283,12 @@ proc main() =
   # Parse all expressions from the command line
 
   var root: seq[Node]
-  for expr in commandLineParams():
-    let r = exprParser.match(expr, root)
-    if not r.ok:
-      echo "Error: ", expr
-      echo "       " & repeat(" ", r.matchMax) & "^"
-      quit 1
+  let expr = commandLineParams().join(" ")
+  let r = exprParser.match(expr, root)
+  if not r.ok:
+    echo "Error: ", expr
+    echo "       " & repeat(" ", r.matchMax) & "^"
+    quit 1
 
   when debug:
     for n in root:
@@ -297,7 +297,7 @@ proc main() =
   # Parse stdin to find all numbers, and for each line evaluate the
   # expressions
 
-  for l in lines("/dev/stdin"):
+  for l in lines(stdin):
     let r = inputParser.match(l)
     if r.ok:
       let vars = r.captures.mapIt(it.parseNumber)
