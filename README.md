@@ -49,8 +49,7 @@ Kind of like a streaming spreadsheet.
 
 ### Signal processing
 
-- `lowpass(val [,alpha [,Q]])`: Biquad lowpass filter. `alpha` is the frequency
-  in range `0..0.5`, `Q` is the filter Q factor.
+- `lowpass(val [,alpha [,Q]])`: Biquad lowpass filter. `alpha`: frequency `0..0.5`, `Q`: Q factor.
 - `int(val)`: Integrator / summation.
 - `diff(val)`: Differentiator
 
