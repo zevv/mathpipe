@@ -10,6 +10,7 @@ import biquad
 
 type
   Function = proc(val: float): float
+  Operator = proc(a, b: float): float
 
 
 proc newAvg(): Function =
@@ -69,40 +70,61 @@ var opTable = {
 
 
 type
+
   Data = object
     st: seq[float]
     variable: seq[float]
     functions: seq[Function]
     callNum: int
 
+  NodeKind = enum
+    nkRoot, nkConst, nkVar, nkCall, nkOp
 
-let exprParser = peg(exprs, data: Data):
+  Node = ref object
+    case kind: NodeKind
+    of nkConst:
+      val: float
+    of nkVar:
+      varIdx: int
+    of nkCall:
+      fn: Function
+    of nkOp:
+      op: Operator
+    else:
+      discard
+    s: string
+    kids: seq[Node]
+
+
+proc `$`(n: Node, prefix=""): string =
+  result.add prefix & $n.kind & ":" & n.s & "\n"
+  for nc in n.kids:
+    result.add `$`(nc, prefix & "  ")
+
+
+
+let exprParser1 = peg(exprs, st: seq[Node]):
 
   S <- *Space
 
   number <- >(+Digit * ?( '.' * +Digit)) * S:
-    data.st.add parseFloat($1)
+    st.add Node(kind: nkConst, s: $1, val: parseFloat($1))
   
   variable <- '$' * >+Digit * S:
-    let n = parseInt($1)
-    data.st.add data.variable[n-1]
-
+    st.add Node(kind: nkVar, s: $1, varIdx: parseInt($1))
+    
   call <- >+Alpha * "(" * args * ")":
-    if data.functions.len <= data.callNum:
-      if $1 in funcTable:
-        data.functions.add funcTable[$1]()
-      else:
-        echo "Unknown function ", $1
-        quit 1
-    data.st.add data.functions[data.callnum](data.st.pop)
-    inc data.callNum
+    let a = st.pop
+    st.add Node(kind: nkCall, s: $1, fn: funcTable[$1](), kids: @[a])
 
   args <- exp
 
   parenExp <- ( "(" * exp * ")" ) ^ 0
 
   uniMinus <- '-' * exp:
-    data.st.add(-data.st.pop)
+    let a = st.pop
+    proc neg(v: float): float = -v
+    st.add Node(kind: nkCall, s: "-", fn: neg, kids: @[a])
 
   prefix <- variable | number | call | parenExp | uniMinus
 
@@ -110,35 +132,39 @@ let exprParser = peg(exprs, data: Data):
            >{'*','/'}    * exp ^  2 |
            >{'^'}        * exp ^^ 3 :
 
-    let (f2, f1) = (data.st.pop, data.st.pop)
-    data.st.add opTable[$1](f1, f2)
+    let (a2, a1) = (st.pop, st.pop)
+    st.add Node(kind: nkOp, s: $1, op: opTable[$1], kids: @[a1, a2])
 
   exp <- S * prefix * *infix * S
 
   exprs <- exp * *( ',' * S * exp) * !1
 
 
-
-let inputParser = peg(line, data: Data):
+let inputParser = peg line:
   line <- *@number
-  number <- >(+Digit * ?( '.' * +Digit)):
-    data.variable.add parseFloat($1)
+  number <- >(+Digit * ?( '.' * +Digit))
 
 
 let expr = paramStr(1)
+var st: seq[Node]
+let r = exprParser1.match(expr, st)
 
-var data = Data()
+if not r.ok:
+  echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
+  quit 1
+
+for stc in st:
+  echo stc
+
+
+
 
 for l in lines("/dev/stdin"):
+  let r = inputParser.match(l)
+  let vars = r.captures.mapIt(it.parseFloat)
+  echo vars
 
-  data.variable.setLen 0
-  data.st.setlen 0
-  data.callNum = 0
-
-  # TODO: AST instead of reparse for every line
- 
-  let r = inputParser.match(l, data)
-
+#[
   try:
     let r = exprParser.match(expr, data)
     if r.ok:
@@ -149,4 +175,4 @@ for l in lines("/dev/stdin"):
   except:
     echo "booo"
     discard
-
+]#
