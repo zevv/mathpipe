@@ -5,8 +5,11 @@ import strutils
 import math
 import os
 import sequtils
+import strformat
+import stats
 
 import biquad
+import misc
 
 type
   Function = proc(val: float): float
@@ -50,7 +53,7 @@ proc newMax(): Function =
     vMax = max(vMax, v)
     vMax
 
-proc newInt(): Function =
+proc newIntegrate(): Function =
   var vTot: float
   return proc(v: float): float =
     vTot += v
@@ -61,6 +64,10 @@ proc newDiff(): Function =
   return proc(v: float): float =
     result = v - vPrev
     vPrev = v
+
+proc newLog(): Function =
+  return proc(v: float): float =
+    ln(v)
 
 proc newLowpass(): Function =
   var biquad = initBiquad(BiquadLowpass, 0.1)
@@ -84,20 +91,36 @@ proc newVariance(): Function =
       result = sNew / (n - 1)
 
 proc newStddev(): Function =
-  let variance = newVariance()
+  let fnVariance = newVariance()
   return proc(v: float): float =
-    sqrt(variance(v))
+    sqrt(fnVariance(v))
+
+proc newStddev2(): Function =
+  var rs: RunningStat
+  return proc(v: float): float =
+    rs.push(v)
+    return rs.standardDeviation()
+
+proc newHistogram(): Function =
+  var vals: seq[float]
+  return proc(v: float): float =
+    result = v
+    vals.add v
+    drawHistogram(vals)
 
 
 const funcTable = {
   "avg": newAvg,
   "min": newMin,
   "max": newMax,
-  "int": newInt,
+  "integrate": newIntegrate,
   "diff": newDiff,
+  "log": newLog,
   "lowpass": newLowpass,
   "stddev": newStddev,
+  "stddev2": newStddev2,
   "variance": newVariance,
+  "histogram": newHistogram,
 }.toTable()
 
 
@@ -108,6 +131,7 @@ var opTable = {
   "-": proc(a, b: float): float = a - b,
   "*": proc(a, b: float): float = a * b,
   "/": proc(a, b: float): float = a / b,
+  "%": proc(a, b: float): float = a mod b,
   "^": proc(a, b: float): float = pow(a, b),
 }.toTable()
 
@@ -130,8 +154,10 @@ let exprParser1 = peg(exprs, st: seq[Node]):
   
   variable <- '$' * >+Digit * S:
     st.add Node(kind: nkVar, s: $1, varIdx: parseInt($1))
+
+  functionName <- Alpha * *Alnum
     
-  call <- >+Alpha * "(" * args * ")":
+  call <- >functionName * "(" * args * ")":
     let a = st.pop
     st.add Node(kind: nkCall, s: $1, fn: funcTable[$1](), kids: @[a])
 
@@ -146,9 +172,9 @@ let exprParser1 = peg(exprs, st: seq[Node]):
 
   prefix <- variable | number | call | parenExp | uniMinus
 
-  infix <- >{'+','-'}    * exp ^  1 |
-           >{'*','/'}    * exp ^  2 |
-           >{'^'}        * exp ^^ 3 :
+  infix <- >{'+','-'}     * exp ^  1 |
+           >{'*','/','%'} * exp ^  2 |
+           >{'^'}         * exp ^^ 3 :
 
     let (a2, a1) = (st.pop, st.pop)
     st.add Node(kind: nkOp, s: $1, op: opTable[$1], kids: @[a1, a2])
@@ -158,6 +184,12 @@ let exprParser1 = peg(exprs, st: seq[Node]):
   exprs <- exp * *( ',' * S * exp) * !1
 
 
+
+let inputParser = peg line:
+  line <- *@number
+  number <- >(+Digit * ?( '.' * +Digit))
+
+
 # Evaluate AST tree
 
 proc eval(root: Node, args: seq[float]): float =
@@ -165,16 +197,13 @@ proc eval(root: Node, args: seq[float]): float =
   proc aux(n: Node): float =
     case n.kind
     of nkConst: n.val
-    of nkVar: args[n.varIdx-1]
-    of nkCall: n.fn(aux(n.kids[0]))
-    of nkOp: n.op(aux(n.kids[0]), aux(n.kids[1]))
+    of nkVar:   args[n.varIdx-1]
+    of nkCall:  n.fn(aux(n.kids[0]))
+    of nkOp:    n.op(aux(n.kids[0]), aux(n.kids[1]))
 
   result = aux(root)
 
 
-let inputParser = peg line:
-  line <- *@number
-  number <- >(+Digit * ?( '.' * +Digit))
 
 
 let expr = paramStr(1)
@@ -193,5 +222,5 @@ for l in lines("/dev/stdin"):
   let r = inputParser.match(l)
   if r.ok:
     let vars = r.captures.mapIt(it.parseFloat)
-    echo root.mapIt($it.eval(vars)).join(" ")
+    echo root.mapIt(it.eval(vars)).join(" ")
 
