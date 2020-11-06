@@ -28,6 +28,9 @@ type
 
 proc config*(bq: var Biquad, kind: BiquadKind, freq: float, Q: float) =
 
+  if bq.kind == kind and bq.freq == freq and bq.Q == Q:
+    return
+
   bq.kind = kind
   bq.freq = freq
   bq.Q = Q

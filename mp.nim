@@ -11,9 +11,22 @@ import stats
 import biquad
 import misc
 
-type
-  Function = proc(val: openArray[float]): float
+const
 
+  debug = false
+
+type
+
+  FuncDesc = object
+    name: string
+    argsMin: int
+    argsMax: int
+    factory: FuncFactory
+
+  Func = proc(val: openArray[float]): float
+
+  FuncFactory = proc(): Func
+  
   NodeKind = enum
     nkConst, nkVar, nkCall
 
@@ -24,81 +37,114 @@ type
     of nkVar:
       varIdx: int
     of nkCall:
-      fn: Function
-    else:
-      discard
-    s: string
+      fd: FuncDesc
+      fn: Func
     kids: seq[Node]
 
-proc newAvg(): Function =
+
+var funcTable: Table[string, FuncDesc]
+
+template def(funcName: string, body: untyped) =
+  let factory = proc(): Func =
+    body
+
+  funcTable[funcName] = FuncDesc(
+    name: funcName,
+    factory: factory,
+  )
+
+template unOp(op: untyped) =
+  return proc(vs: openArray[float]): float = op(vs[0])
+ 
+template binOp(op: untyped) =
+  return proc(vs: openArray[float]): float = op(vs[0], vs[1])
+
+# Primitive operations and functions
+
+def "+", binOp `+`
+def "-", binOp `-`
+def "*", binOp `*`
+def "/", binOp `/`
+def "%", binOp `mod`
+def "^", binOp `pow`
+
+def "cos", unOp cos
+def "sin", unOp cos
+def "tan", unOp cos
+def "atan", unOp cos
+def "hypot", binOp hypot
+def "neg": unOp `-`
+def "log": binOp log
+def "log2": unOp log2
+def "log10": unOp log10
+def "floor": unOp floor
+def "ceil": unOp ceil
+def "round": unOp round
+
+# Stateful primitives, implemented as closures
+
+def "min":
+  var vMin = float.high
+  return proc(vs: openArray[float]): float =
+    vMin = min(vMin, vs[0])
+    vMin
+
+def "max":
+  var vMax = float.low
+  return proc(vs: openArray[float]): float =
+    vMax = max(vMax, vs[0])
+    vMax
+
+def "sum":
+  var vTot: float
+  return proc(vs: openArray[float]): float =
+    vTot += vs[0]
+    vs[0]
+
+def "int":
+  var vTot: float
+  return proc(vs: openArray[float]): float =
+    vTot += vs[0]
+    vs[0]
+
+def "diff":
+  var vPrev: float
+  return proc(vs: openArray[float]): float =
+    result = vs[0] - vPrev
+    vPrev = vs[0]
+
+def "ln":
+  return proc(vs: openArray[float]): float =
+    ln(vs[0])
+
+def "lowpass":
+  var biquad = initBiquad(BiquadLowpass, 0.1)
+  return proc(vs: openArray[float]): float =
+    let alpha = if vs.len >= 2: vs[1] else: 0.1
+    let Q = if vs.len >= 3: vs[2] else: 0.707
+    biquad.config(BiquadLowpass, alpha, Q)
+    biquad.run(vs[0])
+
+def "mean":
   var vTot, n: float
   return proc(vs: openArray[float]): float =
     vTot += vs[0]
     n += 1
     vTot / n
 
-proc newMin(): Function =
-  var vMin = float.high
+def "variance":
+  var rs: RunningStat
   return proc(vs: openArray[float]): float =
-    vMin = min(vMin, vs[0])
-    vMin
+    rs.push(vs[0])
+    return rs.variance()
 
-proc newMax(): Function =
-  var vMax = float.low
-  return proc(vs: openArray[float]): float =
-    vMax = max(vMax, vs[0])
-    vMax
-
-proc newIntegrate(): Function =
-  var vTot: float
-  return proc(vs: openArray[float]): float =
-    vTot += vs[0]
-    vs[0]
-
-proc newDiff(): Function =
-  var vPrev: float
-  return proc(vs: openArray[float]): float =
-    result = vs[0] - vPrev
-    vPrev = vs[0]
-
-proc newLog(): Function =
-  return proc(vs: openArray[float]): float =
-    ln(vs[0])
-
-proc newLowpass(): Function =
-  var biquad = initBiquad(BiquadLowpass, 0.1)
-  return proc(vs: openArray[float]): float =
-    echo len(vs)
-    biquad.run(vs[0])
-
-proc newVariance(): Function =
-  # Rolling variance deviation using Welford's algorithm
-  var n, mOld, mNew, sOld, sNew: float
-  return proc(vs: openArray[float]): float =
-    n += 1
-    if n == 1:
-      mOld = vs[0]
-      mNew = vs[0]
-      result = 0
-    else:
-      mNew = mOld + (vs[0] - mOld) / n
-      sNew = sOld + (vs[0] - mOld) * (vs[0] - mNew)
-      mOld = mNew
-      sOld = sNew
-      result = sNew / (n - 1)
-
-proc newStddev(): Function =
-  let fnVariance = newVariance()
-  return proc(vs: openArray[float]): float =
-    sqrt(fnVariance(vs))
-
-proc newStddev2(): Function =
+def "stddef":
   var rs: RunningStat
   return proc(vs: openArray[float]): float =
     rs.push(vs[0])
     return rs.standardDeviation()
 
-proc newHistogram(): Function =
+def "histogram":
   var vals: seq[float]
   return proc(vs: openArray[float]): float =
     result = vs[0]
@@ -106,66 +152,61 @@ proc newHistogram(): Function =
     drawHistogram(vals)
 
 
-const funcTable = {
-  "avg": newAvg,
-  "min": newMin,
-  "max": newMax,
-  "integrate": newIntegrate,
-  "diff": newDiff,
-  "log": newLog,
-  "lowpass": newLowpass,
-  "stddev": newStddev,
-  "stddev2": newStddev2,
-  "variance": newVariance,
-  "histogram": newHistogram,
-}.toTable()
+# Dump AST tree
+
+when debug:
+  proc `$`(n: Node, prefix=""): string =
+    result.add prefix & $n.kind & " "
+    result.add case n.kind
+    of nkConst: $n.val
+    of nkVar: "$" & $n.varIdx
+    of nkCall: n.fd.name
+    result.add "\n"
+    for nc in n.kids:
+      result.add `$`(nc, prefix & "  ")
 
 
-# Operator primitives
+# Evaluate AST tree
 
-var opTable = {
-  "+": proc(vs: openArray[float]): float = vs[0] + vs[1],
-  "-": proc(vs: openArray[float]): float = vs[0] - vs[1],
-  "*": proc(vs: openArray[float]): float = vs[0] * vs[1],
-  "/": proc(vs: openArray[float]): float = vs[0] / vs[1],
-  "%": proc(vs: openArray[float]): float = vs[0] mod vs[1],
-  "^": proc(vs: openArray[float]): float = pow(vs[0], vs[1]),
-}.toTable()
-
-
-
-proc `$`(n: Node, prefix=""): string =
-  result.add prefix & $n.kind & ":" & n.s & "\n"
-  for nc in n.kids:
-    result.add `$`(nc, prefix & "  ")
+proc eval(root: Node, args: seq[float]): float =
+  proc aux(n: Node): float =
+    case n.kind
+    of nkConst: n.val
+    of nkVar: args[n.varIdx-1]
+    of nkCall: n.fn(n.kids.map(aux))
+  result = aux(root)
 
 
 # Expression -> AST parser
 
-let exprParser1 = peg(exprs, st: seq[Node]):
+const exprParser = peg(exprs, st: seq[Node]):
 
   S <- *Space
 
   number <- >(+Digit * ?( '.' * +Digit)) * S:
-    st.add Node(kind: nkConst, s: $1, val: parseFloat($1))
+    st.add Node(kind: nkConst, val: parseFloat($1))
   
-  variable <- '$' * >+Digit * S:
-    st.add Node(kind: nkVar, s: $1, varIdx: parseInt($1))
+  variable <- {'%','$'} * >+Digit * S:
+    st.add Node(kind: nkVar, varIdx: parseInt($1))
 
-  functionName <- Alpha * *Alnum
-    
-  call <- >functionName * "(" * args * ")":
+  call <- functionName * "(" * args * ")"
+  
+  functionName <- Alpha * *Alnum:
+    let fd = funcTable[$0]
+    st.add Node(kind: nkCall, fd: fd, fn: fd.factory())
+
+  args <- arg * *( "," * S * arg)
+
+  arg <- exp:
     let a = st.pop
-    st.add Node(kind: nkCall, s: $1, fn: funcTable[$1](), kids: @[a])
-
-  args <- exp * *( "," * S * exp)
+    st[^1].kids.add a
 
   parenExp <- ( "(" * exp * ")" ) ^ 0
 
   uniMinus <- '-' * exp:
     let a = st.pop
-    proc neg(vs: openArray[float]): float = -vs[0]
-    st.add Node(kind: nkCall, s: "-", fn: neg, kids: @[a])
+    let fd = funcTable["neg"]
+    st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[a])
 
   prefix <- variable | number | call | parenExp | uniMinus
 
@@ -173,50 +214,43 @@ let exprParser1 = peg(exprs, st: seq[Node]):
            >{'*','/','%'} * exp ^  2 |
            >{'^'}         * exp ^^ 3 :
 
+    let fd = funcTable[$1]
     let (a2, a1) = (st.pop, st.pop)
-    st.add Node(kind: nkCall, s: $1, fn: opTable[$1], kids: @[a1, a2])
+    st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[a1, a2])
 
   exp <- S * prefix * *infix * S
 
   exprs <- exp * *( ',' * S * exp) * !1
 
 
+# Input parser: finds numbers in a line
 
-let inputParser = peg line:
+const inputParser = peg line:
   line <- *@number
   number <- >(+Digit * ?( '.' * +Digit))
 
 
-# Evaluate AST tree
+# Main code
 
-proc eval(root: Node, args: seq[float]): float =
+proc main() =
 
-  proc aux(n: Node): float =
-    case n.kind
-    of nkConst: n.val
-    of nkVar:   args[n.varIdx-1]
-    of nkCall:  n.fn(n.kids.map(aux))
+  let expr = commandLineParams().join(" ")
+  var root: seq[Node]
+  let r = exprParser.match(expr, root)
 
-  result = aux(root)
+  if not r.ok:
+    echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
+    quit 1
 
+  when debug:
+    for n in root:
+      echo n
 
+  for l in lines("/dev/stdin"):
+    let r = inputParser.match(l)
+    if r.ok:
+      let vars = r.captures.mapIt(it.parseFloat)
+      proc format(v: float): string = &"{v:g}"
+      echo root.mapIt(it.eval(vars).format).join(" ")
 
-
-let expr = paramStr(1)
-var root: seq[Node]
-let r = exprParser1.match(expr, root)
-
-if not r.ok:
-  echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
-  quit 1
-
-for n in root:
-  echo n
-
-
-for l in lines("/dev/stdin"):
-  let r = inputParser.match(l)
-  if r.ok:
-    let vars = r.captures.mapIt(it.parseFloat)
-    echo root.mapIt(it.eval(vars)).join(" ")
-
+main()
