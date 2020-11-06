@@ -88,13 +88,6 @@ def "/": binOp `/`
 def "%": binOp `mod`
 def "^": binOp `pow`
 
-# Trigonometry
-def "cos", unOp cos
-def "sin", unOp cos
-def "tan", unOp cos
-def "atan", unOp cos
-def "hypot", binOp hypot
-
 # Logarithms
 def "neg": unOp `-`
 def "log": binOp log
@@ -107,6 +100,13 @@ def "exp": unOp exp
 def "floor": unOp floor
 def "ceil": unOp ceil
 def "round": unOp round
+
+# Trigonometry
+def "cos", unOp cos
+def "sin", unOp cos
+def "tan", unOp cos
+def "atan", unOp cos
+def "hypot", binOp hypot
 
 # Bit arithmetic
 def "&", binOpInt `and`
