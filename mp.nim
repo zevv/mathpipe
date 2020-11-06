@@ -20,8 +20,7 @@ type
 
   FuncDesc = object
     name: string
-    argsMin: int
-    argsMax: int
+    args: string
     factory: FuncFactory
 
   Func = proc(val: openArray[float]): float
@@ -49,14 +48,15 @@ var
 
 # Generic helper functions
 
-template def(funcName: string, body: untyped) =
+template def(iname: string, body: untyped) =
   let factory = proc(): Func =
     body
 
-  funcTable[funcName] = FuncDesc(
-    name: funcName,
+  funcTable[iname] = FuncDesc(
+    name: iname,
     factory: factory,
   )
+
 
 proc parseNumber(s: string): float =
   if s.len > 2 and s[1] in {'x','X'}:
@@ -81,26 +81,34 @@ template binOpInt(op: untyped) =
 
 # Binary and unary operators
 
-def "+", binOp `+`
-def "-", binOp `-`
-def "*", binOp `*`
-def "/", binOp `/`
-def "%", binOp `mod`
-def "^", binOp `pow`
+def "+": binOp `+`
+def "-": binOp `-`
+def "*": binOp `*`
+def "/": binOp `/`
+def "%": binOp `mod`
+def "^": binOp `pow`
 
+# Trigonometry
 def "cos", unOp cos
 def "sin", unOp cos
 def "tan", unOp cos
 def "atan", unOp cos
 def "hypot", binOp hypot
+
+# Logarithms
 def "neg": unOp `-`
 def "log": binOp log
 def "log2": unOp log2
 def "log10": unOp log10
+def "ln": unOp ln
+def "exp": unOp exp
+
+# Rounding
 def "floor": unOp floor
 def "ceil": unOp ceil
 def "round": unOp round
- 
+
+# Bit arithmetic
 def "&", binOpInt `and`
 def "and", binOpInt `and`
 def "|", binOpInt `or`
@@ -112,7 +120,7 @@ def ">>", binOpInt `shr`
 def "shr", binOpInt `shr`
 
 
-# Stateful primitives, implemented as closures
+# Statistics
 
 def "min":
   var vMin = float.high
@@ -126,35 +134,6 @@ def "max":
     vMax = max(vMax, vs[0])
     vMax
 
-def "sum":
-  var vTot: float
-  return proc(vs: openArray[float]): float =
-    vTot += vs[0]
-    vs[0]
-
-def "int":
-  var vTot: float
-  return proc(vs: openArray[float]): float =
-    vTot += vs[0]
-    vs[0]
-
-def "diff":
-  var vPrev: float
-  return proc(vs: openArray[float]): float =
-    result = vs[0] - vPrev
-    vPrev = vs[0]
-
-def "ln":
-  return proc(vs: openArray[float]): float =
-    ln(vs[0])
-
-def "lowpass":
-  var biquad = initBiquad(BiquadLowpass, 0.1)
-  return proc(vs: openArray[float]): float =
-    let alpha = if vs.len >= 2: vs[1] else: 0.1
-    let Q = if vs.len >= 3: vs[2] else: 0.707
-    biquad.config(BiquadLowpass, alpha, Q)
-    biquad.run(vs[0])
 
 def "mean":
   var vTot, n: float
@@ -174,6 +153,36 @@ def "stddef":
   return proc(vs: openArray[float]): float =
     rs.push(vs[0])
     return rs.standardDeviation()
+
+# Signal processing
+
+def "sum":
+  var vTot: float
+  return proc(vs: openArray[float]): float =
+    vTot += vs[0]
+    vs[0]
+
+def "int":
+  var vTot: float
+  return proc(vs: openArray[float]): float =
+    vTot += vs[0]
+    vs[0]
+
+def "diff":
+  var vPrev: float
+  return proc(vs: openArray[float]): float =
+    result = vs[0] - vPrev
+    vPrev = vs[0]
+
+def "lowpass":
+  var biquad = initBiquad(BiquadLowpass, 0.1)
+  return proc(vs: openArray[float]): float =
+    let alpha = if vs.len >= 2: vs[1] else: 0.1
+    let Q = if vs.len >= 3: vs[2] else: 0.707
+    biquad.config(BiquadLowpass, alpha, Q)
+    biquad.run(vs[0])
+
+# Utilities
 
 def "histogram":
   var vals: seq[float]
