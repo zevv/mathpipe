@@ -10,15 +10,53 @@ import biquad
 
 type
   Function = proc(val: float): float
+
   Operator = proc(a, b: float): float
 
+  NodeKind = enum
+    nkConst, nkVar, nkCall, nkOp
+
+  Node = ref object
+    case kind: NodeKind
+    of nkConst:
+      val: float
+    of nkVar:
+      varIdx: int
+    of nkCall:
+      fn: Function
+    of nkOp:
+      op: Operator
+    else:
+      discard
+    s: string
+    kids: seq[Node]
+
+
+# Rolling standard deviation with Welford's algorithm
+
+proc newStddev(): Function =
+  var n, mOld, mNew, sOld, sNew: float
+  return proc(v: float): float =
+    n += 1
+    if n == 1:
+      mOld = v
+      mNew = v
+      result = 0
+    else:
+      mNew = mOld + (v - mOld) / n
+      sNew = sOld + (v - mOld) * (v - mNew)
+      mOld = mNew
+      sOld = sNew
+      result = sqrt(sNew / (n - 1))
+
+# Function primitives
 
 proc newAvg(): Function =
-  var vTotal, vCount: float
+  var vTot, n: float
   return proc(v: float): float =
-    vTotal += v
-    vCount += 1
-    vTotal / vCount
+    vTot += v
+    n += 1
+    vTot / n
 
 proc newMin(): Function =
   var vMin = float.high
@@ -57,8 +95,11 @@ const funcTable = {
   "int": newInt,
   "diff": newDiff,
   "lp": newLp,
+  "stddev": newStddev,
 }.toTable()
 
+
+# Operator primitives
 
 var opTable = {
   "+": proc(a, b: float): float = a + b,
@@ -69,32 +110,6 @@ var opTable = {
 }.toTable()
 
 
-type
-
-  Data = object
-    st: seq[float]
-    variable: seq[float]
-    functions: seq[Function]
-    callNum: int
-
-  NodeKind = enum
-    nkRoot, nkConst, nkVar, nkCall, nkOp
-
-  Node = ref object
-    case kind: NodeKind
-    of nkConst:
-      val: float
-    of nkVar:
-      varIdx: int
-    of nkCall:
-      fn: Function
-    of nkOp:
-      op: Operator
-    else:
-      discard
-    s: string
-    kids: seq[Node]
-
 
 proc `$`(n: Node, prefix=""): string =
   result.add prefix & $n.kind & ":" & n.s & "\n"
@@ -102,6 +117,7 @@ proc `$`(n: Node, prefix=""): string =
     result.add `$`(nc, prefix & "  ")
 
 
+# Expression -> AST parser
 
 let exprParser1 = peg(exprs, st: seq[Node]):
 
@@ -140,39 +156,40 @@ let exprParser1 = peg(exprs, st: seq[Node]):
   exprs <- exp * *( ',' * S * exp) * !1
 
 
+# Evaluate AST tree
+
+proc eval(root: Node, args: seq[float]): float =
+
+  proc aux(n: Node): float =
+    case n.kind
+    of nkConst: n.val
+    of nkVar: args[n.varIdx-1]
+    of nkCall: n.fn(aux(n.kids[0]))
+    of nkOp: n.op(aux(n.kids[0]), aux(n.kids[1]))
+
+  result = aux(root)
+
+
 let inputParser = peg line:
   line <- *@number
   number <- >(+Digit * ?( '.' * +Digit))
 
 
 let expr = paramStr(1)
-var st: seq[Node]
-let r = exprParser1.match(expr, st)
+var root: seq[Node]
+let r = exprParser1.match(expr, root)
 
 if not r.ok:
   echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
   quit 1
 
-for stc in st:
-  echo stc
-
-
+for n in root:
+  echo n
 
 
 for l in lines("/dev/stdin"):
   let r = inputParser.match(l)
-  let vars = r.captures.mapIt(it.parseFloat)
-  echo vars
+  if r.ok:
+    let vars = r.captures.mapIt(it.parseFloat)
+    echo root.mapIt($it.eval(vars)).join(" ")
 
-#[
-  try:
-    let r = exprParser.match(expr, data)
-    if r.ok:
-      echo data.st.mapIt($it).join(", ")
-    else:
-      echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
-      quit 1
-  except:
-    echo "booo"
-    discard
-]#
