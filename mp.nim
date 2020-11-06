@@ -31,26 +31,6 @@ type
     s: string
     kids: seq[Node]
 
-
-# Rolling standard deviation with Welford's algorithm
-
-proc newStddev(): Function =
-  var n, mOld, mNew, sOld, sNew: float
-  return proc(v: float): float =
-    n += 1
-    if n == 1:
-      mOld = v
-      mNew = v
-      result = 0
-    else:
-      mNew = mOld + (v - mOld) / n
-      sNew = sOld + (v - mOld) * (v - mNew)
-      mOld = mNew
-      sOld = sNew
-      result = sqrt(sNew / (n - 1))
-
-# Function primitives
-
 proc newAvg(): Function =
   var vTot, n: float
   return proc(v: float): float =
@@ -82,10 +62,31 @@ proc newDiff(): Function =
     result = v - vPrev
     vPrev = v
 
-proc newLp(): Function =
+proc newLowpass(): Function =
   var biquad = initBiquad(BiquadLowpass, 0.1)
   return proc(v: float): float =
     biquad.run(v)
+
+proc newVariance(): Function =
+  # Rolling variance deviation using Welford's algorithm
+  var n, mOld, mNew, sOld, sNew: float
+  return proc(v: float): float =
+    n += 1
+    if n == 1:
+      mOld = v
+      mNew = v
+      result = 0
+    else:
+      mNew = mOld + (v - mOld) / n
+      sNew = sOld + (v - mOld) * (v - mNew)
+      mOld = mNew
+      sOld = sNew
+      result = sNew / (n - 1)
+
+proc newStddev(): Function =
+  let variance = newVariance()
+  return proc(v: float): float =
+    sqrt(variance(v))
 
 
 const funcTable = {
@@ -94,8 +95,9 @@ const funcTable = {
   "max": newMax,
   "int": newInt,
   "diff": newDiff,
-  "lp": newLp,
+  "lowpass": newLowpass,
   "stddev": newStddev,
+  "variance": newVariance,
 }.toTable()
 
 
