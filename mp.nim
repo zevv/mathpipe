@@ -7,6 +7,7 @@ import os
 import sequtils
 import strformat
 import stats
+import strutils
 
 import biquad
 import misc
@@ -53,11 +54,20 @@ template def(funcName: string, body: untyped) =
     factory: factory,
   )
 
+proc asInt(f: float): int =
+  result = f.int
+  if result.float != f:
+    raise newException(ValueError, "Value " & $f & " has no integer representation")
+
 template unOp(op: untyped) =
   return proc(vs: openArray[float]): float = op(vs[0])
  
 template binOp(op: untyped) =
   return proc(vs: openArray[float]): float = op(vs[0], vs[1])
+
+template binOpInt(op: untyped) =
+  return proc(vs: openArray[float]): float = op(vs[0].asInt, vs[1].asInt).float
+
 
 # Primitive operations and functions
 
@@ -80,6 +90,19 @@ def "log10": unOp log10
 def "floor": unOp floor
 def "ceil": unOp ceil
 def "round": unOp round
+
+# Operators acting on integer values. Both C and Nim style
+ 
+def "&", binOpInt `and`
+def "and", binOpInt `and`
+def "|", binOpInt `or`
+def "or", binOpInt `or`
+def "xor", binOpInt `xor`
+def "<<", binOpInt `shl`
+def "shl", binOpInt `shl`
+def ">>", binOpInt `shr`
+def "shr", binOpInt `shr`
+
 
 # Stateful primitives, implemented as closures
 
@@ -177,21 +200,44 @@ proc eval(root: Node, args: seq[float]): float =
   result = aux(root)
 
 
+# Common grammar elements
+
+grammar numbers:
+
+  intPart <- '0' | {'1'..'9'} * *{'0'..'9'}
+  fractPart <- "." * +{'0'..'9'}  
+  expPart <- ( 'e' | 'E' ) * ?( '+' | '-' ) * +{'0'..'9'}
+
+  float <- intPart * ?fractPart * ?expPart
+  hex <- '0' * {'x','X'} * +Xdigit
+
+  number <- hex | float
+
+
+proc parseNumber(s: string): float =
+  if s.len > 2 and s[1] in {'x','X'}:
+    result = s.parseHexInt.float
+  else:
+    result = s.parseFloat
+
+
 # Expression -> AST parser
 
 const exprParser = peg(exprs, st: seq[Node]):
 
   S <- *Space
 
-  number <- >(+Digit * ?( '.' * +Digit)) * S:
-    st.add Node(kind: nkConst, val: parseFloat($1))
-  
-  variable <- {'%','$'} * >+Digit * S:
+  number <- >numbers.number:
+    st.add Node(kind: nkConst, val: parseNumber($1))
+
+  variable <- {'%','$'} * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
   call <- functionName * "(" * args * ")"
   
   functionName <- Alpha * *Alnum:
+    if $0 notin funcTable:
+      return false
     let fd = funcTable[$0]
     st.add Node(kind: nkCall, fd: fd, fn: fd.factory())
 
@@ -204,13 +250,15 @@ const exprParser = peg(exprs, st: seq[Node]):
     let fd = funcTable["neg"]
     st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[st.pop])
 
-  prefix <- variable | number | call | parenExp | uniMinus
+  prefix <- (variable | number | call | parenExp | uniMinus) * S
   
-  parenExp <- ( "(" * exp * ")" ) ^ 0
+  parenExp <- ( "(" * exp * ")" )                                 ^   0
 
-  infix <- >{'+','-'}     * exp ^  1 |
-           >{'*','/','%'} * exp ^  2 |
-           >{'^'}         * exp ^^ 3 :
+  infix <- >("|" | "or" | "xor")                            * exp ^   3 |
+           >("&" | "and")                                   * exp ^   4 |
+           >("+" | "-")                                     * exp ^   8 |
+           >("*" | "/" | "%" | "<<" | ">>" | "shl" | "shr") * exp ^   9 |
+           >("^")                                           * exp ^^ 10 :
 
     let fd = funcTable[$1]
     let (a2, a1) = (st.pop, st.pop)
@@ -221,11 +269,10 @@ const exprParser = peg(exprs, st: seq[Node]):
   exprs <- exp * *( ',' * S * exp) * !1
 
 
-# Input parser: finds numbers in a line
+# Input parser: finds all numbers in a line
 
 const inputParser = peg line:
-  line <- *@number
-  number <- >(+Digit * ?( '.' * +Digit))
+  line <- *@>numbers.number
 
 
 # Main code
@@ -238,7 +285,8 @@ proc main() =
   for expr in commandLineParams():
     let r = exprParser.match(expr, root)
     if not r.ok:
-      echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
+      echo "Error: ", expr
+      echo "       " & repeat(" ", r.matchMax) & "^"
       quit 1
 
   when debug:
@@ -251,7 +299,7 @@ proc main() =
   for l in lines("/dev/stdin"):
     let r = inputParser.match(l)
     if r.ok:
-      let vars = r.captures.mapIt(it.parseFloat)
+      let vars = r.captures.mapIt(it.parseNumber)
       proc format(v: float): string = &"{v:g}"
       echo root.mapIt(it.eval(vars).format).join(" ")
 

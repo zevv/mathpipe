@@ -1,6 +1,6 @@
 
 mp: mp.nim misc.nim biquad.nim
-	nim c -d:release mp.nim
+	nim c mp.nim
 
 clean:
 	rm -f mp
