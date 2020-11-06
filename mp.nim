@@ -43,7 +43,11 @@ type
     kids: seq[Node]
 
 
-var funcTable: Table[string, FuncDesc]
+var
+  funcTable: Table[string, FuncDesc]
+
+
+# Generic helper functions
 
 template def(funcName: string, body: untyped) =
   let factory = proc(): Func =
@@ -53,6 +57,12 @@ template def(funcName: string, body: untyped) =
     name: funcName,
     factory: factory,
   )
+
+proc parseNumber(s: string): float =
+  if s.len > 2 and s[1] in {'x','X'}:
+    result = s.parseHexInt.float
+  else:
+    result = s.parseFloat
 
 proc asInt(f: float): int =
   result = f.int
@@ -69,7 +79,7 @@ template binOpInt(op: untyped) =
   return proc(vs: openArray[float]): float = op(vs[0].asInt, vs[1].asInt).float
 
 
-# Primitive operations and functions
+# Binary and unary operators
 
 def "+", binOp `+`
 def "-", binOp `-`
@@ -90,8 +100,6 @@ def "log10": unOp log10
 def "floor": unOp floor
 def "ceil": unOp ceil
 def "round": unOp round
-
-# Operators acting on integer values. Both C and Nim style
  
 def "&", binOpInt `and`
 def "and", binOpInt `and`
@@ -200,7 +208,7 @@ proc eval(root: Node, args: seq[float]): float =
   result = aux(root)
 
 
-# Common grammar elements
+# Common grammar
 
 grammar numbers:
 
@@ -214,13 +222,6 @@ grammar numbers:
   number <- hex | float
 
 
-proc parseNumber(s: string): float =
-  if s.len > 2 and s[1] in {'x','X'}:
-    result = s.parseHexInt.float
-  else:
-    result = s.parseFloat
-
-
 # Expression -> AST parser
 
 const exprParser = peg(exprs, st: seq[Node]):
@@ -230,10 +231,10 @@ const exprParser = peg(exprs, st: seq[Node]):
   number <- >numbers.number:
     st.add Node(kind: nkConst, val: parseNumber($1))
 
-  variable <- {'%','$'} * >+Digit:
+  variable <- '$' * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
-  call <- functionName * "(" * args * ")"
+  call <- functionName * ( "(" * args * ")" | args)
   
   functionName <- Alpha * *Alnum:
     if $0 notin funcTable:
