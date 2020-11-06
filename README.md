@@ -1,16 +1,11 @@
 
-Mathpipe is a simple command line tool to do batch calculations and
-transformations on numbers found in plain text files. One or more expressions
-are passed which are evaluated, the input is read anything that looks like a
-number on standard input.
-
-Kind of like a streaming spreadsheet.
+Kind of like a spreadsheet for text pipes.
 
 ## Usage
 
-Mathpipe takes one or more expressions as command line arguments and reads
-data from standard input. The numbers found in the input lines are available
-as variables for the expressions through the notation `$1` .. `$9`.
+Mathpipe takes one or more expressions as command line arguments and reads data
+from standard input. The numbers found in each lines are available as variables
+for the expressions through the notation `$1` .. `$9`.
 
 The expressions can contain the usual arithmatic operators with normal
 precedence, and allow calling of various built-in functions as described below.
@@ -18,7 +13,7 @@ precedence, and allow calling of various built-in functions as described below.
 
 ## Examples
 
-- Multiply column #1 by a fixed number: `mp "%1*2"`
+- Multiply column #1 by a fixed number: `mp "$1*8"`
 - Create a running sum: `mp sum(%1)"`
 - Low pass filter to smooth noisy data: `mp "lowpass(%1)"`
 - Basic arithmatic combining multiple columns: `mp "$1 * ($2 + $3)"`
@@ -38,6 +33,7 @@ precedence, and allow calling of various built-in functions as described below.
 - `min(val)`: Running minimum
 - `max(val)`: Running maximum
 - `mean(val)`: Running mean / average
+- `median(val)`: Running median
 - `variance(val)`: Running variance
 - `stddef(val)`: Running sandard deviation
 

@@ -309,8 +309,11 @@ proc main() =
   for l in lines(stdin):
     let r = inputParser.match(l)
     if r.ok:
-      let vars = r.captures.mapIt(it.parseNumber)
-      proc format(v: float): string = &"{v:g}"
-      echo root.mapIt(it.eval(vars).format).join(" ")
+      try:
+        let vars = r.captures.mapIt(it.parseNumber)
+        proc format(v: float): string = &"{v:g}"
+        echo root.mapIt(it.eval(vars).format).join(" ")
+      except:
+        discard
 
 main()
