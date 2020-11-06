@@ -10,6 +10,8 @@ for the expressions through the notation `$1` .. `$9`.
 The expressions can contain the usual arithmatic operators with normal
 precedence, and allow calling of various built-in functions as described below.
 
+Some of these functions save state over lines, allowing things like
+averaging, integration, filtering, etc.
 
 ## Examples
 
