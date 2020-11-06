@@ -198,17 +198,15 @@ const exprParser = peg(exprs, st: seq[Node]):
   args <- arg * *( "," * S * arg)
 
   arg <- exp:
-    let a = st.pop
-    st[^1].kids.add a
-
-  parenExp <- ( "(" * exp * ")" ) ^ 0
+    st[^2].kids.add st.pop
 
   uniMinus <- '-' * exp:
-    let a = st.pop
     let fd = funcTable["neg"]
-    st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[a])
+    st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[st.pop])
 
   prefix <- variable | number | call | parenExp | uniMinus
+  
+  parenExp <- ( "(" * exp * ")" ) ^ 0
 
   infix <- >{'+','-'}     * exp ^  1 |
            >{'*','/','%'} * exp ^  2 |
@@ -234,17 +232,21 @@ const inputParser = peg line:
 
 proc main() =
 
-  let expr = commandLineParams().join(" ")
-  var root: seq[Node]
-  let r = exprParser.match(expr, root)
+  # Parse all expressions from the command line
 
-  if not r.ok:
-    echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
-    quit 1
+  var root: seq[Node]
+  for expr in commandLineParams():
+    let r = exprParser.match(expr, root)
+    if not r.ok:
+      echo "Error parsing expression at: ", expr[r.matchMax .. ^1]
+      quit 1
 
   when debug:
     for n in root:
       echo n
+
+  # Parse stdin to find all numbers, and for each line evaluate the
+  # expressions
 
   for l in lines("/dev/stdin"):
     let r = inputParser.match(l)
