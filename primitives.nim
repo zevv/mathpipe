@@ -8,15 +8,25 @@ import stats
 
 type
 
-  FuncDesc* = object
-    name*: string
-    args*: string
-    factory*: proc(): Func
+  FuncDesc = object
+    name: string
+    args: string
+    factory: proc(): Func
 
   Func* = proc(val: openArray[float]): float
 
 var
-  funcTable*: Table[string, FuncDesc]
+  funcTable: Table[string, FuncDesc]
+
+
+# Generate function with given name
+
+proc makeFunc*(name: string): Func =
+
+  if name notin funcTable:
+    raise newException(ValueError, "Unknown function: " & name)
+
+  return funcTable[name].factory()
 
 
 # Generic helper functions

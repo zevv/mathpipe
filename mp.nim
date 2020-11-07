@@ -25,36 +25,8 @@ type
     of nkVar:
       varIdx: int
     of nkCall:
-      fd: FuncDesc
       fn: Func
     kids: seq[Node]
-
-
-
-# Dump AST tree
-
-when debug:
-  proc `$`(n: Node, prefix=""): string =
-    result.add prefix & $n.kind & " "
-    result.add case n.kind
-    of nkConst: $n.val
-    of nkVar: "$" & $n.varIdx
-    of nkCall: n.fd.name
-    result.add "\n"
-    for nc in n.kids:
-      result.add `$`(nc, prefix & "  ")
-
-
-# Evaluate AST tree
-
-proc eval(root: Node, args: seq[float]): float =
-  proc aux(n: Node): float =
-    case n.kind
-    of nkConst: n.val
-    of nkVar:args[n.varIdx-1]
-    of nkCall: n.fn(n.kids.map(aux))
-  result = aux(root)
-
 
 # Common grammar
 
@@ -89,12 +61,9 @@ const exprParser = peg(exprs, st: seq[Node]):
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
   call <- functionName * ( "(" * args * ")" | args)
-  
+
   functionName <- Alpha * *Alnum:
-    if $0 notin funcTable:
-      return false
-    let fd = funcTable[$0]
-    st.add Node(kind: nkCall, fd: fd, fn: fd.factory())
+    st.add Node(kind: nkCall, fn: makeFunc($0))
 
   args <- arg * *( "," * S * arg)
 
@@ -102,11 +71,10 @@ const exprParser = peg(exprs, st: seq[Node]):
     st[^2].kids.add st.pop
 
   uniMinus <- '-' * exp:
-    let fd = funcTable["neg"]
-    st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[st.pop])
+    st.add Node(kind: nkCall, fn: makeFunc("neg"), kids: @[st.pop])
 
   prefix <- (variable | number | call | parenExp | uniMinus) * S
-  
+
   parenExp <- ( "(" * exp * ")" )                                 ^   0
 
   infix <- >("|" | "or" | "xor")                            * exp ^   3 |
@@ -115,9 +83,8 @@ const exprParser = peg(exprs, st: seq[Node]):
            >("*" | "/" | "%" | "<<" | ">>" | "shl" | "shr") * exp ^   9 |
            >("^")                                           * exp ^^ 10 :
 
-    let fd = funcTable[$1]
     let (a2, a1) = (st.pop, st.pop)
-    st.add Node(kind: nkCall, fd: fd, fn: fd.factory(), kids: @[a1, a2])
+    st.add Node(kind: nkCall, fn: makeFunc($1), kids: @[a1, a2])
 
   exp <- S * prefix * *infix * S
 
@@ -130,6 +97,31 @@ const inputParser = peg line:
   line <- *@>numbers.number
 
 
+# Dump AST tree
+
+when debug:
+  proc `$`(n: Node, prefix=""): string =
+    result.add prefix & $n.kind & " "
+    result.add case n.kind
+    of nkConst: $n.val
+    of nkVar: "$" & $n.varIdx
+    else: ""
+    result.add "\n"
+    for nc in n.kids:
+      result.add `$`(nc, prefix & "  ")
+
+
+# Evaluate AST tree
+
+proc eval(root: Node, args: seq[float]): float =
+  proc aux(n: Node): float =
+    case n.kind
+    of nkConst: n.val
+    of nkVar:args[n.varIdx-1]
+    of nkCall: n.fn(n.kids.map(aux))
+  result = aux(root)
+
+
 # Main code
 
 proc main() =
@@ -138,10 +130,14 @@ proc main() =
 
   var root: seq[Node]
   let expr = commandLineParams().join(" ")
-  let r = exprParser.match(expr, root)
-  if not r.ok:
-    echo "Error: ", expr
-    echo "       " & repeat(" ", r.matchMax) & "^"
+  try:
+    let r = exprParser.match(expr, root)
+    if not r.ok:
+      echo "Error: ", expr
+      echo "       " & repeat(" ", r.matchMax) & "^"
+      quit 1
+  except:
+    stderr.write getCurrentExceptionMsg() & "\n"
     quit 1
 
   when debug:
