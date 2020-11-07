@@ -37,7 +37,7 @@ averaging, integration, filtering, etc.
 - `mean(val)`: Running mean / average
 - `median(val)`: Running median
 - `variance(val)`: Running variance
-- `stddef(val)`: Running sandard deviation
+- `stddev(val)`: Running sandard deviation
 
 ### Utilities
 

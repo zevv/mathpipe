@@ -146,7 +146,7 @@ def "variance":
     rs.push(vs[0])
     return rs.variance()
 
-def "stddef":
+def "stddev":
   var rs: RunningStat
   return proc(vs: openArray[float]): float =
     rs.push(vs[0])
