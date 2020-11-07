@@ -46,7 +46,7 @@ const exprParser = peg(exprs, st: seq[Node]):
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
   call <- >functionName * ( "(" * args * ")" | args):
-    st[^1].fn = makeFunc($1, st[^1].kids)
+    st[^1].fn = findFunc($1, st[^1].kids)
 
   functionName <- Alpha * *Alnum:
     st.add Node(kind: nkCall)
@@ -57,7 +57,8 @@ const exprParser = peg(exprs, st: seq[Node]):
     st[^2].kids.add st.pop
 
   uniMinus <- '-' * exp:
-    st.add Node(kind: nkCall, fn: makeFunc("neg"), kids: @[st.pop])
+    let kids = @[st.pop]
+    st.add Node(kind: nkCall, fn: findFunc("neg", kids), kids: kids)
 
   bool <- "true" | "false":
     st.add newBool($0 == "true")
@@ -77,7 +78,7 @@ const exprParser = peg(exprs, st: seq[Node]):
 
     let (a2, a1) = (st.pop, st.pop)
     let kids = @[a1, a2]
-    st.add Node(kind: nkCall, fn: makeFunc($1, kids), kids: kids)
+    st.add Node(kind: nkCall, fn: findFunc($1, kids), kids: kids)
 
   exp <- S * atom * *binop * S
 

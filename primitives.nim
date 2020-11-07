@@ -7,12 +7,6 @@ import biquad
 import histogram
 import types
 
-type
-
-  FuncDesc = object
-    name: string
-    argKinds: seq[NodeKind]
-    factory: proc(): Func
 
 var
   funcTable: Table[string, seq[FuncDesc]]
@@ -25,10 +19,14 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
   if args.len > fd.argKinds.len:
     return false
 
-  for i, a in args:
-    var k = a.kind
-    if k == nkVar: k = nkFloat
+  for i, n in args:
+    let k = case n.kind:
+      of nkCall: n.fd.retKind
+      of nkVar: nkFloat
+      else: n.kind
+
     if k != fd.argKinds[i]:
+      stdout.write("Type mismatch for " & fd.name & " argument " & $i & ": expected " & $fd.argKinds[i] & ", got " & $k & "\n")
       return false
 
   return true
@@ -36,7 +34,7 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
 
 # Generate function with given name
 
-proc makeFunc*(name: string, args: openArray[Node]=[]): Func =
+proc findFunc*(name: string, args: openArray[Node]=[]): Func =
 
   if name notin funcTable:
     raise newException(ValueError, "Unknown function: " & name)
@@ -50,13 +48,14 @@ proc makeFunc*(name: string, args: openArray[Node]=[]): Func =
 
 # Generic helper functions
 
-template def(iname: string, iargKinds: openArray[NodeKind], body: untyped) =
+template def(iname: string, iargKinds: openArray[NodeKind], iretKind: NodeKind, body: untyped) =
   if iname notin funcTable:
     funcTable[iname] = @[]
 
   funcTable[iname].add FuncDesc(
     name: iname,
     argKinds: @iargKinds,
+    retKind: iretKind,
     factory: proc(): Func = body
   )
 
@@ -71,84 +70,85 @@ template binOpInt(op: untyped) =
 
 
 # Regular binary operators
-def "+", [nkFloat, nkFloat]: binOp `+`
-def "-", [nkFloat, nkFloat]: binOp `-`
-def "*", [nkFloat, nkFloat]: binOp `*`
-def "/", [nkFloat, nkFloat]: binOp `/`
-def "%", [nkFloat, nkFloat]: binOp `mod`
-def "^", [nkFloat, nkFloat]: binOp `pow`
+def "+", [nkFloat, nkFloat], nkFloat: binOp `+`
+def "-", [nkFloat, nkFloat], nkFloat: binOp `-`
+def "*", [nkFloat, nkFloat], nkFloat: binOp `*`
+def "/", [nkFloat, nkFloat], nkFloat: binOp `/`
+def "%", [nkFloat, nkFloat], nkFloat: binOp `mod`
+def "^", [nkFloat, nkFloat], nkFloat: binOp `pow`
 
 # Bit arithmetic
-def "&", [nkFloat, nkFloat]: binOpInt `and`
-def "and", [nkFloat, nkFloat]: binOpInt `and`
-def "|", [nkFloat, nkFloat]: binOpInt `or`
-def "or", [nkFloat, nkFloat]: binOpInt `or`
-def "xor", [nkFloat, nkFloat]: binOpInt `xor`
-def "<<", [nkFloat, nkFloat]: binOpInt `shl`
-def "shl", [nkFloat, nkFloat]: binOpInt `shl`
-def ">>", [nkFloat, nkFloat]: binOpInt `shr`
-def "shr", [nkFloat, nkFloat]: binOpInt `shr`
+def "&",   [nkFloat, nkFloat], nkFloat: binOpInt `and`
+def "and", [nkFloat, nkFloat], nkFloat: binOpInt `and`
+def "|",   [nkFloat, nkFloat], nkFloat: binOpInt `or`
+def "or",  [nkFloat, nkFloat], nkFloat: binOpInt `or`
+def "xor", [nkFloat, nkFloat], nkFloat: binOpInt `xor`
+def "<<",  [nkFloat, nkFloat], nkFloat: binOpInt `shl`
+def "shl", [nkFloat, nkFloat], nkFloat: binOpInt `shl`
+def ">>",  [nkFloat, nkFloat], nkFloat: binOpInt `shr`
+def "shr", [nkFloat, nkFloat], nkFloat: binOpInt `shr`
 
 # Logarithms
-def "neg", [nkFloat]: unOp `-`
-def "log", [nkFloat, nkFloat]: binOp log
-def "log2", [nkFloat]: unOp log2
-def "log10", [nkFloat]: unOp log10
-def "ln", [nkFloat, nkFloat]: unOp ln
-def "exp", [nkFloat, nkFloat]: unOp exp
+def "neg",   [nkFloat], nkFloat: unOp `-`
+def "log2",  [nkFloat], nkFloat: unOp log2
+def "log10", [nkFloat], nkFloat: unOp log10
+def "ln",    [nkFloat], nkFloat: unOp ln
+def "exp",   [nkFloat], nkFloat: unOp exp
+def "log",   [nkFloat, nkFloat], nkFloat: binOp log
+def "pow",   [nkFloat, nkFloat], nkFloat: binOp pow
 
 # Rounding
-def "floor", [nkFloat]: unOp floor
-def "ceil", [nkFloat]: unOp ceil
-def "round", [nkFloat]: unOp round
+def "floor", [nkFloat], nkFloat: unOp floor
+def "ceil",  [nkFloat], nkFloat: unOp ceil
+def "round", [nkFloat], nkFloat: unOp round
 
 # Trigonometry
-def "cos", [nkFloat]: unOp cos
-def "sin", [nkFloat]: unOp cos
-def "tan", [nkFloat]: unOp cos
-def "atan", [nkFloat]: unOp cos
-def "hypot", [nkFloat, nkFloat]: binOp hypot
+def "cos",   [nkFloat], nkFloat: unOp cos
+def "sin",   [nkFloat], nkFloat: unOp cos
+def "tan",   [nkFloat], nkFloat: unOp cos
+def "atan",  [nkFloat], nkFloat: unOp cos
+def "hypot", [nkFloat, nkFloat], nkFloat: binOp hypot
 
 # String
 
-def "repeat", [nkString, nkFloat]:
+def "repeat", [nkString, nkFloat], nkString:
   return proc(vs: openArray[Node]): Node =
     let s = vs[0].getString
     let n = vs[1].getInt
     newString s.repeat(n)
 
-def "&", [nkString, nkString]:
+def "&", [nkString, nkString], nkString:
   return proc(vs: openArray[Node]): Node =
     newString vs[0].getString & vs[1].getString
 
 # Statistics
 
-def "min", [nkFloat]:
+def "min", [nkFloat], nkFloat:
   var vMin = float.high
   return proc(vs: openArray[Node]): Node =
     vMin = min(vMin, vs[0].getfloat)
     newFloat vMin
 
-def "max", [nkFloat]:
+def "max", [nkFloat], nkFloat:
   var vMax = float.low
   return proc(vs: openArray[Node]): Node =
     vMax = max(vMax, vs[0].getfloat)
     newFloat vMax
 
-def "mean", [nkFloat]:
+def "mean", [nkFloat], nkFloat:
   var vTot, n: float
   return proc(vs: openArray[Node]): Node =
     vTot += vs[0].getfloat
     n += 1
     newFloat vTot / n
 
-def "variance", [nkFloat]:
+def "variance", [nkFloat], nkFloat:
   var rs: RunningStat
   return proc(vs: openArray[Node]): Node =
     rs.push(vs[0].getfloat)
     newFloat rs.variance()
 
-def "stddev", [nkFloat]:
+def "stddev", [nkFloat], nkFloat:
   var rs: RunningStat
   return proc(vs: openArray[Node]): Node =
     rs.push(vs[0].getfloat)
@@ -156,28 +156,28 @@ def "stddev", [nkFloat]:
 
 # Signal processing
 
-def "sum", [nkFloat]:
+def "sum", [nkFloat], nkFloat:
   var vTot: float
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getfloat
     vTot += v
     newFloat v
 
-def "int", [nkFloat]:
+def "int", [nkFloat], nkFloat:
   var vTot: float
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getfloat
     vTot += v
     newFloat v
 
-def "diff", [nkFloat]:
+def "diff", [nkFloat], nkFloat:
   var vPrev: float
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getFloat
     result = newFloat v - vPrev
     vPrev = v
 
-def "lowpass", [nkFloat]:
+def "lowpass", [nkFloat], nkFloat:
   var biquad = initBiquad(BiquadLowpass, 0.1)
   return proc(vs: openArray[Node]): Node =
     let alpha = if vs.len >= 2: vs[1].getFloat else: 0.1
@@ -187,7 +187,7 @@ def "lowpass", [nkFloat]:
 
 # Utilities
 
-def "histogram", [nkFloat, nkFloat, nkBool]:
+def "histogram", [nkFloat, nkFloat, nkBool], nkFloat:
   var vals: seq[float]
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getFloat
