@@ -51,7 +51,7 @@ const exprParser = peg(exprs, st: seq[Node]):
   functionName <- Alpha * *Alnum:
     st.add Node(kind: nkCall)
 
-  args <- arg * *( "," * S * arg)
+  args <- *(arg * ?"," * S)
 
   arg <- exp:
     st[^2].kids.add st.pop

@@ -14,26 +14,21 @@ var
 
 
 proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
-
   result = true
-
-  if args.len > fd.argKinds.len:
+  if args.len != fd.argKinds.len:
     return false
-
   for i, n in args:
     let k = case n.kind:
       of nkCall: n.fd.retKind
       of nkVar: nkFloat
       else: n.kind
-
     if k != fd.argKinds[i]:
       stdout.write("Type mismatch for " & fd.name & " argument " & $i & ": expected " & $fd.argKinds[i] & ", got " & $k & "\n")
       return false
 
   return true
 
-
-# Generate function with given name
+# Find a matching function with the given name and argument types
 
 proc findFunc*(name: string, args: openArray[Node]=[]): Func =
   if name notin funcTable:
@@ -44,6 +39,7 @@ proc findFunc*(name: string, args: openArray[Node]=[]): Func =
   let tmp = args.mapIt($it.kind).join(", ")
   raise newException(ValueError, "No matching arguments found for " & name & "(" & tmp & ")")
 
+# Generate function with given name
 
 template def(iname: string, iargKinds: openArray[NodeKind], iretKind: NodeKind, body: untyped) =
   if iname notin funcTable:
@@ -162,14 +158,14 @@ def "sum", [nkFloat], nkFloat:
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getfloat
     vTot += v
-    newFloat v
+    newFloat vTot
 
 def "int", [nkFloat], nkFloat:
   var vTot: float
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getfloat
     vTot += v
-    newFloat v
+    newFloat vTot
 
 def "diff", [nkFloat], nkFloat:
   var vPrev: float
@@ -188,13 +184,22 @@ def "lowpass", [nkFloat], nkFloat:
 
 # Utilities
 
-def "histogram", [nkFloat, nkFloat, nkBool], nkFloat:
+
+def "histogram", [nkFloat], nkFloat:
   var vals: seq[float]
   return proc(vs: openArray[Node]): Node =
     let v = vs[0].getFloat
     vals.add v
-    let width = if vs.len > 1: vs[1].getFloat else: 4.0
-    drawHistogram(vals, width)
+    drawHistogram(vals)
     newFloat v
+
+def "histogram", [nkFloat, nkFloat], nkFloat:
+  var vals: seq[float]
+  return proc(vs: openArray[Node]): Node =
+    let v = vs[0].getFloat
+    vals.add v
+    drawHistogram(vals, vs[1].getFloat)
+    newFloat v
+
 
 
