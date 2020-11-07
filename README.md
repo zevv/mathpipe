@@ -40,10 +40,6 @@ averaging, integration, filtering, etc.
 - `variance(val)`: Running variance
 - `stddev(val)`: Running sandard deviation
 
-### Utilities
-
-- `histogram(val)`: Render ASCII historgram of input data
-
 ### Bit arithmetic
 
 The functions below all require the input data to be representable
@@ -54,6 +50,10 @@ as integers.
 - `x and y` / `x & y`: Binary and
 - `x or y` / `x | y`: Binary or
 - `x xor y`: Binary xor
+
+### Utilities
+
+- `histogram(val)`: Render ASCII historgram of input data
 
 ### Logarithms
 
