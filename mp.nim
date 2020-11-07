@@ -45,10 +45,11 @@ const exprParser = peg(exprs, st: seq[Node]):
   variable <- {'$','%'} * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
-  call <- functionName * ( "(" * args * ")" | args)
+  call <- >functionName * ( "(" * args * ")" | args):
+    st[^1].fn = makeFunc($1, st[^1].kids)
 
   functionName <- Alpha * *Alnum:
-    st.add Node(kind: nkCall, fn: makeFunc($0))
+    st.add Node(kind: nkCall)
 
   args <- arg * *( "," * S * arg)
 
@@ -75,7 +76,8 @@ const exprParser = peg(exprs, st: seq[Node]):
            >("^")                                           * exp ^^ 10 :
 
     let (a2, a1) = (st.pop, st.pop)
-    st.add Node(kind: nkCall, fn: makeFunc($1), kids: @[a1, a2])
+    let kids = @[a1, a2]
+    st.add Node(kind: nkCall, fn: makeFunc($1, kids), kids: kids)
 
   exp <- S * atom * *binop * S
 
