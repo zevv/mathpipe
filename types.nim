@@ -8,18 +8,18 @@ type
 
   Node* = ref object
     case kind*: NodeKind
+    of nkBool:
+      vBool: bool
     of nkFloat:
       vFloat*: float
+    of nkString:
+      vString: string
     of nkVar:
       varIdx*: int
     of nkCall:
       fd*: FuncDesc
       fn*: Func
-    of nkString:
-      vString: string
-    of nkBool:
-      vBool: bool
-    kids*: seq[Node]
+      args*: seq[Node]
 
   Func* = proc(val: openArray[Node]): Node
   
@@ -40,12 +40,8 @@ proc newBool*(v: bool): Node =
   Node(kind: nkBool, vBool: v)
 
 
-proc checkKind(n: Node, k: NodeKind) =
-  if n.kind != k:
-    raise newException(ValueError, "Node " & $n.kind & " is not a " & $k)
-
 proc getFloat*(n: Node): float =
-  n.checkKind nkFloat
+  assert n.kind == nkFloat
   n.vFloat
 
 proc getInt*(n: Node): int =
@@ -55,11 +51,11 @@ proc getInt*(n: Node): int =
     raise newException(ValueError, "Value " & $f & " has no integer representation")
 
 proc getString*(n: Node): string =
-  n.checkKind nkString
+  assert n.kind == nkString
   n.vString
 
 proc getBool*(n: Node): bool =
-  n.checkKind nkBool
+  assert n.kind == nkBool
   n.vBool
 
 proc `$`*(n: Node): string =

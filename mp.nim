@@ -46,7 +46,7 @@ const exprParser = peg(exprs, st: seq[Node]):
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
   call <- >functionName * ( "(" * args * ")" | args):
-    st[^1].fn = findFunc($1, st[^1].kids)
+    st[^1].fn = findFunc($1, st[^1].args)
 
   functionName <- Alpha * *Alnum:
     st.add Node(kind: nkCall)
@@ -54,11 +54,11 @@ const exprParser = peg(exprs, st: seq[Node]):
   args <- *(arg * ?"," * S)
 
   arg <- exp:
-    st[^2].kids.add st.pop
+    st[^2].args.add st.pop
 
   uniMinus <- '-' * exp:
-    let kids = @[st.pop]
-    st.add Node(kind: nkCall, fn: findFunc("neg", kids), kids: kids)
+    let args = @[st.pop]
+    st.add Node(kind: nkCall, fn: findFunc("neg", args), args: args)
 
   bool <- "true" | "false":
     st.add newBool($0 == "true")
@@ -77,8 +77,8 @@ const exprParser = peg(exprs, st: seq[Node]):
            >("^")                                           * exp ^^ 10 :
 
     let (a2, a1) = (st.pop, st.pop)
-    let kids = @[a1, a2]
-    st.add Node(kind: nkCall, fn: findFunc($1, kids), kids: kids)
+    let args = @[a1, a2]
+    st.add Node(kind: nkCall, fn: findFunc($1, args), args: args)
 
   exp <- S * atom * *binop * S
 
@@ -97,7 +97,7 @@ proc eval(n: Node, args: seq[float]): Node =
   proc aux(n: Node): Node =
     case n.kind
     of nkVar: newFloat args[n.varIdx-1]
-    of nkCall: n.fn(n.kids.map(aux))
+    of nkCall: n.fn(n.args.map(aux))
     else: n
   result = aux(n)
 
