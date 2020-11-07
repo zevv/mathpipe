@@ -4,8 +4,10 @@ Kind of like a spreadsheet for text pipes.
 ## Usage
 
 Mathpipe takes one or more expressions as command line arguments and reads data
-from standard input. The numbers found in each lines are available as variables
-for the expressions through the notation `$1` .. `$9`.
+from standard input. The input can contain anything, and is scanned for
+everything resembling decimal or hexadecimal numbers. The numbers found in each
+lines are available as variables for the expressions through the variables `$1`
+.. `$9`.
 
 The expressions can contain the usual arithmatic and binary operators and allow
 calling of various built-in functions as described below.

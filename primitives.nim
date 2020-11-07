@@ -151,6 +151,7 @@ def "histogram":
   return proc(vs: openArray[float]): float =
     result = vs[0]
     vals.add vs[0]
-    drawHistogram(vals)
+    let width = if vs.len > 1: vs[1] else: 4.0
+    drawHistogram(vals, width)
 
 

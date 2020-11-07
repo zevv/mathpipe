@@ -1,6 +1,7 @@
 import strformat
 import terminal
 import stats
+import math
 import strutils
 
 proc siFmt*(v: SomeNumber, align=false): string =
@@ -34,27 +35,29 @@ proc siFmt*(v: SomeNumber, align=false): string =
     format(1e-9, "G")
 
    
-proc drawHistogram*(vals: openArray[float]) =
+proc drawHistogram*(vals: openArray[float], width=2.0, log=false) =
 
   if vals.len <= 1:
     return
 
   let
     w = terminalWidth() - 10
-    h = terminalHeight() - 2
+    h = terminalHeight() - 3
     avg = vals.mean
     stddev = vals.standardDeviation
-    width = 4.0
     bins = min(vals.len, h)
     min = avg - stddev * width
     max = avg + stddev * width
     binsize = (max - min) / bins.float
+  if binsize == 0.0:
+    return
   var bin = newSeq[float](bins)
   var binMax = 0.0
   for v in vals:
     let idx = int((v - min) / binsize)
-    bin[idx] += 1
-    binMax = max(binMax, bin[idx])
+    if idx >= 0 and idx < bin.len:
+      bin[idx] += 1
+      binMax = max(binMax, bin[idx])
   echo "\e[H"
   for i, b in bin:
     let binavg = min + (i.float + 0.5) * binsize
