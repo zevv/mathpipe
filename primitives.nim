@@ -1,6 +1,7 @@
 import tables
 import strutils
 import math
+import sequtils
 import stats
 
 import biquad
@@ -35,23 +36,18 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
 # Generate function with given name
 
 proc findFunc*(name: string, args: openArray[Node]=[]): Func =
-
   if name notin funcTable:
     raise newException(ValueError, "Unknown function: " & name)
-
   for fd in funcTable[name]:
     if fd.argsMatch(args):
       return fd.factory()
-  
-  raise newException(ValueError, "No matching arguments found for " & name)
+  let tmp = args.mapIt($it.kind).join(", ")
+  raise newException(ValueError, "No matching arguments found for " & name & "(" & tmp & ")")
 
-
-# Generic helper functions
 
 template def(iname: string, iargKinds: openArray[NodeKind], iretKind: NodeKind, body: untyped) =
   if iname notin funcTable:
     funcTable[iname] = @[]
-
   funcTable[iname].add FuncDesc(
     name: iname,
     argKinds: @iargKinds,
@@ -59,55 +55,60 @@ template def(iname: string, iargKinds: openArray[NodeKind], iretKind: NodeKind, 
     factory: proc(): Func = body
   )
 
-template unOp(op: untyped) =
-  return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getFloat)
- 
-template binOp(op: untyped) =
-  return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getFloat, vs[1].getFloat)
+template defUniOp(iname: string, op: untyped) =
+  def iname, [nkFloat], nkFloat:
+    return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getFloat)
 
-template binOpInt(op: untyped) =
-  return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getInt, vs[1].getInt).float
+template defBinOp(iname: string, op: untyped) =
+  def iname, [nkFloat, nkFloat], nkFloat:
+    return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getFloat, vs[1].getFloat)
 
+template defBinOpInt(iname: string, op: untyped) =
+  def iname, [nkFloat, nkFloat], nkFloat:
+    return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getInt, vs[1].getInt).float
 
 # Regular binary operators
-def "+", [nkFloat, nkFloat], nkFloat: binOp `+`
-def "-", [nkFloat, nkFloat], nkFloat: binOp `-`
-def "*", [nkFloat, nkFloat], nkFloat: binOp `*`
-def "/", [nkFloat, nkFloat], nkFloat: binOp `/`
-def "%", [nkFloat, nkFloat], nkFloat: binOp `mod`
-def "^", [nkFloat, nkFloat], nkFloat: binOp `pow`
+defBinOp "+", `+`
+defBinOp "-", `-`
+defBinOp "*", `*`
+defBinOp "/", `/`
+defBinOp "%", `mod`
+defBinOp "^", `pow`
 
 # Bit arithmetic
-def "&",   [nkFloat, nkFloat], nkFloat: binOpInt `and`
-def "and", [nkFloat, nkFloat], nkFloat: binOpInt `and`
-def "|",   [nkFloat, nkFloat], nkFloat: binOpInt `or`
-def "or",  [nkFloat, nkFloat], nkFloat: binOpInt `or`
-def "xor", [nkFloat, nkFloat], nkFloat: binOpInt `xor`
-def "<<",  [nkFloat, nkFloat], nkFloat: binOpInt `shl`
-def "shl", [nkFloat, nkFloat], nkFloat: binOpInt `shl`
-def ">>",  [nkFloat, nkFloat], nkFloat: binOpInt `shr`
-def "shr", [nkFloat, nkFloat], nkFloat: binOpInt `shr`
+defBinOpInt "&", `and`
+defBinOpInt "and", `and`
+defBinOpInt "|", `or`
+defBinOpInt "or", `or`
+defBinOpInt "xor", `xor`
+defBinOpInt "<<", `shl`
+defBinOpInt "shl", `shl`
+defBinOpInt ">>", `shr`
+defBinOpInt "shr", `shr`
 
 # Logarithms
-def "neg",   [nkFloat], nkFloat: unOp `-`
-def "log2",  [nkFloat], nkFloat: unOp log2
-def "log10", [nkFloat], nkFloat: unOp log10
-def "ln",    [nkFloat], nkFloat: unOp ln
-def "exp",   [nkFloat], nkFloat: unOp exp
-def "log",   [nkFloat, nkFloat], nkFloat: binOp log
-def "pow",   [nkFloat, nkFloat], nkFloat: binOp pow
+defUniOp "neg", `-`
+defUniOp "log2", log2
+defUniOp "log10", log10
+defUniOp "ln", ln
+defUniOp "exp", exp
+defBinOp "log", log
+defBinOp "pow", pow
 
 # Rounding
-def "floor", [nkFloat], nkFloat: unOp floor
-def "ceil",  [nkFloat], nkFloat: unOp ceil
-def "round", [nkFloat], nkFloat: unOp round
+defUniOp "floor", floor
+defUniOp "ceil", ceil
+defUniOp "round", round
 
 # Trigonometry
-def "cos",   [nkFloat], nkFloat: unOp cos
-def "sin",   [nkFloat], nkFloat: unOp cos
-def "tan",   [nkFloat], nkFloat: unOp cos
-def "atan",  [nkFloat], nkFloat: unOp cos
-def "hypot", [nkFloat, nkFloat], nkFloat: binOp hypot
+defUniOp "cos", cos
+defUniOp "sin", sin
+defUniOp "tan", tan
+defUniOp "atan", arctan
+defUniOp "arctan", arctan
+defBinOp "atan2", arctan2
+defBinOp "arctan2", arctan2
+defBinOp "hypot",  hypot
 
 # String
 
