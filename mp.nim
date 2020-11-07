@@ -47,14 +47,10 @@ var
 # Generic helper functions
 
 template def(iname: string, body: untyped) =
-  let factory = proc(): Func =
-    body
-
   funcTable[iname] = FuncDesc(
     name: iname,
-    factory: factory,
+    factory: proc(): Func = body
   )
-
 
 proc parseNumber(s: string): float =
   if s.len > 2 and s[1] in {'x','X'}:
@@ -131,7 +127,6 @@ def "max":
   return proc(vs: openArray[float]): float =
     vMax = max(vMax, vs[0])
     vMax
-
 
 def "mean":
   var vTot, n: float
@@ -219,14 +214,13 @@ proc eval(root: Node, args: seq[float]): float =
 
 grammar numbers:
 
-  intPart <- '0' | {'1'..'9'} * *{'0'..'9'}
-  fractPart <- "." * +{'0'..'9'}  
-  expPart <- ( 'e' | 'E' ) * ?( '+' | '-' ) * +{'0'..'9'}
+  exponent <- {'e','E'} * ?{'+','-'} * +Digit
 
-  float <- intPart * ?fractPart * ?expPart
-  hex <- '0' * {'x','X'} * +Xdigit
+  fraction <- '.' * +Digit * ?exponent
 
-  number <- hex | float
+  number <- '0' * ({'x','X'} * Xdigit | ?fraction) |
+            {'1'..'9'} * *Digit * ?fraction |
+            fraction
 
 
 # Expression -> AST parser
