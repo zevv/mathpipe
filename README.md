@@ -7,8 +7,8 @@ Mathpipe takes one or more expressions as command line arguments and reads data
 from standard input. The numbers found in each lines are available as variables
 for the expressions through the notation `$1` .. `$9`.
 
-The expressions can contain the usual arithmatic operators with normal
-precedence, and allow calling of various built-in functions as described below.
+The expressions can contain the usual arithmatic and binary operators and allow
+calling of various built-in functions as described below.
 
 Some of these functions save state over lines, allowing things like
 averaging, integration, filtering, etc.
@@ -20,7 +20,6 @@ averaging, integration, filtering, etc.
 - Low pass filter to smooth noisy data: `mp "lowpass(%1)"`
 - Basic arithmatic combining multiple columns: `mp "$1 * ($2 + $3)"`
 - Render a histogram of input data: `mp "histogram($1)"`
-
 
 ## Function reference
 
