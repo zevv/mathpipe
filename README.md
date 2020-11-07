@@ -63,9 +63,9 @@ as integers.
 
 ### Rounding
 
-- `floor(val)` unOp floor
-- `ceil(val)` unOp ceil
-- `round(val)` unOp round
+- `floor(val)`
+- `ceil(val)`
+- `round(val)`
 
 ### Trigonomety
 
