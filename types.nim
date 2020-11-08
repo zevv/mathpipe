@@ -63,6 +63,9 @@ proc getBool*(n: Node): bool =
   assert n.kind == nkBool
   n.vBool
 
+proc `$`*(k: NodeKind): string =
+  system.`$`(k)[2..^1].toLowerAscii()
+
 proc `$`*(fd: FuncDesc): string =
   result = fd.name & "(" & fd.argKinds.mapit($it).join(", ") & "): " & $fd.retKind
 
@@ -71,7 +74,7 @@ proc `$`*(n: Node): string =
   of nkCall: $n.fd
   of nkFloat: &"{n.vFloat:g}"
   of nkBool: (if n.vBool: "true" else: "false")
-  of nkString: n.vString
+  of nkString: n.vString.escape
   of nkVar: "$" & $n.varIdx
   of nkCol: "#" & $n.colIdx
   else: ""

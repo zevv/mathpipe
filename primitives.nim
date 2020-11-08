@@ -30,13 +30,19 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
 # Find a matching function with the given name and argument types
 
 proc newCall*(name: string, args: seq[Node]): Node =
-  let sig = name & "(" & args.mapIt($it).join(", ") & ")"
+  let sig = name & "(" & args.mapIt($it.kind).join(", ") & ")"
+
   if name notin funcTable:
     raise newException(ValueError, "Unknown function: " & sig)
   for fd in funcTable[name]:
     if fd.argsMatch(args):
       return Node(kind: nkCall, fd: fd, fn: fd.factory(), args: args)
-  raise newException(ValueError, "No matching arguments found for " & sig)
+
+  var err = "No matching arguments found for " & sig & "\n"
+  err.add "candidates:\n"
+  for fd in funcTable[name]:
+    err.add "  " & $fd & "\n"
+  raise newException(ValueError, err)
 
 # Generate function with given name
 
