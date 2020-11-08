@@ -3,10 +3,12 @@ import strutils
 import math
 import sequtils
 import stats
+import macros
 
 import biquad
 import histogram
 import types
+import primmacro
 
 
 var
@@ -46,27 +48,18 @@ proc newCall*(name: string, args: seq[Node]): Node =
 
 # Generate function with given name
 
-template def(iname: string, iargKinds: openArray[NodeKind], iretKind: NodeKind, body: untyped) =
-  if iname notin funcTable:
-    funcTable[iname] = @[]
-  funcTable[iname].add FuncDesc(
-    name: iname,
-    argKinds: @iargKinds,
-    retKind: iretKind,
-    factory: proc(): Func = body
-  )
+template defUniOp(name: string, op: untyped) =
+  prim:
+    proc name(a: float): float = op(a)
 
-template defUniOp(iname: string, op: untyped) =
-  def iname, [nkFloat], nkFloat:
-    return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getFloat)
+template defBinOp(name: string, op: untyped) =
+  prim:
+    proc name(a: float, b: float): float = op(a, b)
 
-template defBinOp(iname: string, op: untyped) =
-  def iname, [nkFloat, nkFloat], nkFloat:
-    return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getFloat, vs[1].getFloat)
+template defBinOpInt(name: string, op: untyped) =
+  prim:
+    proc name(a: float, b: float): float = op(a.int, b.int).float
 
-template defBinOpInt(iname: string, op: untyped) =
-  def iname, [nkFloat, nkFloat], nkFloat:
-    return proc(vs: openArray[Node]): Node = newFloat op(vs[0].getInt, vs[1].getInt).float
 
 # Regular binary operators
 defBinOp "+", `+`
@@ -113,118 +106,106 @@ defBinOp "hypot",  hypot
 
 # String
 
-def "repeat", [nkString, nkFloat], nkString:
-  return proc(vs: openArray[Node]): Node =
-    let s = vs[0].getString
-    let n = vs[1].getInt
-    newString s.repeat(n)
+prim:
+  proc repeat(s: string, n: int): string = 
+    s.repeat(n)
 
-def "&", [nkString, nkString], nkString:
-  return proc(vs: openArray[Node]): Node =
-    newString vs[0].getString & vs[1].getString
+prim:
+  proc `&`(a: string, b: string): string = a & b
 
-def "len", [nkString], nkFloat:
-  return proc(vs: openArray[Node]): Node =
-    newFloat vs[0].getString.len.float
+prim:
+  proc len(s: string): float = s.len.float
 
 # Statistics
 
-def "count", [nkFloat], nkFloat:
+prim:
   var n = 0.0
-  return proc(vs: openArray[Node]): Node =
+  proc count(v: float): float =
     n += 1.0
-    newFloat(n)
+    n
 
-def "min", [nkFloat], nkFloat:
+prim:
   var vMin = float.high
-  return proc(vs: openArray[Node]): Node =
-    vMin = min(vMin, vs[0].getfloat)
-    newFloat vMin
+  proc min(v: float): float =
+    vMin = min(vMin, v)
+    vMin
 
-def "max", [nkFloat], nkFloat:
+prim:
   var vMax = float.low
-  return proc(vs: openArray[Node]): Node =
-    vMax = max(vMax, vs[0].getfloat)
-    newFloat vMax
+  proc max(v: float): float =
+    vMax = max(vMax, v)
+    vMax
 
-def "mean", [nkFloat], nkFloat:
+prim:
   var vTot, n: float
-  return proc(vs: openArray[Node]): Node =
-    vTot += vs[0].getfloat
+  proc mean(v: float): float =
+    vTot += v
     n += 1
-    newFloat vTot / n
+    vtot / n
 
-def "variance", [nkFloat], nkFloat:
+prim:
   var rs: RunningStat
-  return proc(vs: openArray[Node]): Node =
-    rs.push(vs[0].getfloat)
-    newFloat rs.variance()
+  proc variance(v: float): float =
+    rs.push(v)
+    rs.variance()
 
-def "stddev", [nkFloat], nkFloat:
+prim:
   var rs: RunningStat
-  return proc(vs: openArray[Node]): Node =
-    rs.push(vs[0].getfloat)
-    newFloat rs.standardDeviation()
+  proc stddev(v: float): float =
+    rs.push(v)
+    rs.standardDeviation()
 
 # Signal processing
 
-def "sum", [nkFloat], nkFloat:
+prim:
   var vTot: float
-  return proc(vs: openArray[Node]): Node =
-    let v = vs[0].getfloat
+  proc sum(v: float): float =
     vTot += v
-    newFloat vTot
+    vTot
 
-def "int", [nkFloat], nkFloat:
+prim:
   var vTot: float
-  return proc(vs: openArray[Node]): Node =
-    let v = vs[0].getfloat
+  proc int(v: float): float =
     vTot += v
-    newFloat vTot
+    vTot
 
-def "diff", [nkFloat], nkFloat:
+prim:
   var vPrev: float
-  return proc(vs: openArray[Node]): Node =
-    let v = vs[0].getFloat
-    result = newFloat v - vPrev
+  proc diff(v: float): float =
+    result = v - vPrev
     vPrev = v
 
-def "lowpass", [nkFloat], nkFloat:
+prim:
   var biquad = initBiquad(BiquadLowpass, 0.1)
-  return proc(vs: openArray[Node]): Node =
-    let alpha = if vs.len >= 2: vs[1].getFloat else: 0.1
-    let Q = if vs.len >= 3: vs[2].getFloat else: 0.707
+  proc lowpass(v: float): float =
+    biquad.config(BiquadLowpass, 0.1, 0.707)
+    biquad.run(v)
+
+prim:
+  var biquad = initBiquad(BiquadLowpass, 0.1)
+  proc lowpass(v: float, alpha: float): float =
+    biquad.config(BiquadLowpass, alpha, 0.707)
+    biquad.run(v)
+
+prim:
+  var biquad = initBiquad(BiquadLowpass, 0.1)
+  proc lowpass(v: float, alpha: float, Q: float): float =
     biquad.config(BiquadLowpass, alpha, Q)
-    newFloat biquad.run(vs[0].getFloat)
+    biquad.run(v)
 
 # Utilities
 
-
-def "histogram", [nkFloat], nkFloat:
+prim:
   var vals: seq[float]
-  return proc(vs: openArray[Node]): Node =
-    let v = vs[0].getFloat
+  proc histogram(v: float): float =
     vals.add v
     drawHistogram(vals)
-    newFloat v
+    v
 
-def "histogram", [nkFloat, nkFloat], nkFloat:
+prim:
   var vals: seq[float]
-  return proc(vs: openArray[Node]): Node =
-    let v = vs[0].getFloat
+  proc histogram(v: float, width: float): float =
     vals.add v
-    drawHistogram(vals, vs[1].getFloat)
-    newFloat v
-
-
-import macros
-
-macro hop(n: untyped) =
-  echo n.treeRepr
-
-hop:
-  var t = 10.0
-  let x = proc(a: float, b: string): float =
-    t += a + b.len 
-    t
+    drawHistogram(vals, width)
+    v
 

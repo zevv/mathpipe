@@ -40,7 +40,7 @@ const exprParser = peg(exprs, st: seq[Node]):
   S <- *Space
 
   number <- >numbers.number:
-    st.add newFloat parseNumber($1)
+    st.add parseNumber($1).toNode
 
   column <- '#' * >+Digit:
     st.add Node(kind: nkCol, colIdx: parseInt($1))
@@ -63,10 +63,10 @@ const exprParser = peg(exprs, st: seq[Node]):
 
 
   bool <- "true" | "false":
-    st.add newBool($0 == "true")
+    st.add ($0 == "true").toNode
 
   string <- '"' * >*(1 - '"') * '"':
-    st.add newString $1
+    st.add ($1).toNode
 
   atom <- (variable | column | number | bool | string | call | parenExp | uniop) * S
 
@@ -78,7 +78,7 @@ const exprParser = peg(exprs, st: seq[Node]):
   binop <- >("|" | "or" | "xor")                            * exp ^   3 |
            >("&" | "and")                                   * exp ^   4 |
            >("+" | "-")                                     * exp ^   8 |
-           >("*" | "/" | "%" | "<<" | ">>" | "shl" | "shr") * exp ^   9 |
+           >("*" * *Graph | "/" | "%" | "<<" | ">>" | "shl" | "shr") * exp ^   9 |
            >("^")                                           * exp ^^ 10 :
 
     let (a2, a1) = (st.pop, st.pop)
@@ -101,8 +101,8 @@ const inputParser = peg line:
 proc eval(n: Node, args: seq[float], cols: seq[string]): Node =
   proc aux(n: Node): Node =
     case n.kind
-    of nkVar: newFloat args[n.varIdx-1]
-    of nkCol: newString cols[n.colIdx-1]
+    of nkVar: args[n.varIdx-1].toNode
+    of nkCol: cols[n.colIdx-1].toNode
     of nkCall: n.fn(n.args.map(aux))
     else: n
   result = aux(n)

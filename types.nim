@@ -36,13 +36,13 @@ type
     factory*: proc(): Func
 
 
-proc newFloat*(v: float): Node =
-  Node(kind: nkFloat, vFloat: v)
+proc toNode*(v: SomeNumber): Node =
+  Node(kind: nkFloat, vFloat: v.float)
 
-proc newString*(v: string): Node =
+proc toNode*(v: string): Node =
   Node(kind: nkString, vString: v)
 
-proc newBool*(v: bool): Node =
+proc toNode*(v: bool): Node =
   Node(kind: nkBool, vBool: v)
 
 proc getFloat*(n: Node): float =
