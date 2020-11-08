@@ -43,7 +43,7 @@ const exprParser = peg(exprs, st: seq[Node]):
     st.add newFloat parseNumber($1)
 
   column <- '#' * >+Digit:
-    st.add Node(kind: nkVar, colIdx: parseInt($1))
+    st.add Node(kind: nkCol, colIdx: parseInt($1))
 
   variable <- '$' * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
@@ -70,7 +70,7 @@ const exprParser = peg(exprs, st: seq[Node]):
   string <- '"' * >*(1 - '"') * '"':
     st.add newString $1
 
-  atom <- (variable | number | bool | string | call | parenExp | uniMinus) * S
+  atom <- (variable | column | number | bool | string | call | parenExp | uniMinus) * S
 
   parenExp <- ( "(" * exp * ")" )                                 ^   0
 
@@ -97,10 +97,11 @@ const inputParser = peg line:
 
 # Evaluate AST tree
 
-proc eval(n: Node, args: seq[float]): Node =
+proc eval(n: Node, args: seq[float], cols: seq[string]): Node =
   proc aux(n: Node): Node =
     case n.kind
     of nkVar: newFloat args[n.varIdx-1]
+    of nkCol: newString cols[n.colIdx-1]
     of nkCall: n.fn(n.args.map(aux))
     else: n
   result = aux(n)
@@ -131,6 +132,7 @@ proc main() =
     let r = inputParser.match(l)
     if r.ok:
       let vars = r.captures.mapIt(it.parseNumber)
-      echo root.mapIt($it.eval(vars)).join(" ")
+      let cols = l.splitWhitespace()
+      echo root.mapIt($it.eval(vars, cols)).join(" ")
 
 main()

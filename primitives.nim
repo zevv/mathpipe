@@ -21,6 +21,7 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
     let k = case n.kind:
       of nkCall: n.fd.retKind
       of nkVar: nkFloat
+      of nkCol: nkString
       else: n.kind
     if k != fd.argKinds[i]:
       return false
@@ -121,6 +122,12 @@ def "len", [nkString], nkFloat:
     newFloat vs[0].getString.len.float
 
 # Statistics
+
+def "count", [nkFloat], nkFloat:
+  var n = 0.0
+  return proc(vs: openArray[Node]): Node =
+    n += 1.0
+    newFloat(n)
 
 def "min", [nkFloat], nkFloat:
   var vMin = float.high

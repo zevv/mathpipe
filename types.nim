@@ -6,7 +6,7 @@ import strutils
 type
 
   NodeKind* = enum
-    nkVoid, nkFloat, nkVar, nkCall, nkString, nkBool
+    nkVoid, nkFloat, nkVar, nkCol, nkCall, nkString, nkBool
 
   Node* = ref object
     case kind*: NodeKind
@@ -20,6 +20,8 @@ type
       vString: string
     of nkVar:
       varIdx*: int
+    of nkCol:
+      colIdx*: int
     of nkCall:
       fd*: FuncDesc
       fn*: Func
