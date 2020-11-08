@@ -216,3 +216,8 @@ def "histogram", [nkFloat, nkFloat], nkFloat:
     drawHistogram(vals, vs[1].getFloat)
     newFloat v
 
+
+proc makeTest(): func =
+  result = proc(a: float, b: string): float =
+    return 3
+
