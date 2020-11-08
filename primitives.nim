@@ -81,7 +81,7 @@ defBinOpInt ">>", `shr`
 defBinOpInt "shr", `shr`
 
 # Logarithms
-defUniOp "neg", `-`
+defUniOp "-", `-`
 defUniOp "log2", log2
 defUniOp "log10", log10
 defUniOp "ln", ln
@@ -107,7 +107,7 @@ defBinOp "hypot",  hypot
 # String
 
 prim:
-  proc repeat(s: string, n: int): string = 
+  proc repeat(s: string, n: int): string =
     s.repeat(n)
 
 prim:

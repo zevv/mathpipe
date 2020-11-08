@@ -61,7 +61,6 @@ const exprParser = peg(exprs, st: seq[Node]):
     # replace placeholder with full nkCall node
     st[^1] = newCall($1, st[^1].args)
 
-
   bool <- "true" | "false":
     st.add ($0 == "true").toNode
 
@@ -71,19 +70,18 @@ const exprParser = peg(exprs, st: seq[Node]):
   atom <- (variable | column | number | bool | string | call | parenExp | uniop) * S
 
   parenExp <- ( "(" * exp * ")" )                                 ^   0
-  
-  uniop <- '-' * exp:
-    st.add newCall("neg", @[st.pop])
+
+  uniop <- >'-' * exp:
+    st.add newCall($1, @[st.pop])
 
   binop <- >("|" | "or" | "xor")                            * exp ^   3 |
            >("&" | "and")                                   * exp ^   4 |
            >("+" | "-")                                     * exp ^   8 |
-           >("*" * *Graph | "/" | "%" | "<<" | ">>" | "shl" | "shr") * exp ^   9 |
+           >("*" | "/" | "%" | "<<" | ">>" | "shl" | "shr") * exp ^   9 |
            >("^")                                           * exp ^^ 10 :
 
     let (a2, a1) = (st.pop, st.pop)
-    let args = @[a1, a2]
-    st.add newCall($1, args)
+    st.add newCall($1, @[a1, a2])
 
   exp <- S * atom * *binop * S
 
