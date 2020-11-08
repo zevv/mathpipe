@@ -31,7 +31,7 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
 proc newCall*(name: string, args: seq[Node]): Node =
   let sig = name & "(" & args.mapIt($it).join(", ") & ")"
   if name notin funcTable:
-    raise newException(ValueError, "Unknown function: " & name)
+    raise newException(ValueError, "Unknown function: " & sig)
   for fd in funcTable[name]:
     if fd.argsMatch(args):
       return Node(kind: nkCall, fd: fd, fn: fd.factory(), args: args)
@@ -202,6 +202,4 @@ def "histogram", [nkFloat, nkFloat], nkFloat:
     vals.add v
     drawHistogram(vals, vs[1].getFloat)
     newFloat v
-
-
 
