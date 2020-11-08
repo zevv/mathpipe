@@ -23,21 +23,19 @@ proc argsMatch(fd: FuncDesc, args: openArray[Node]): bool =
       of nkVar: nkFloat
       else: n.kind
     if k != fd.argKinds[i]:
-      stdout.write("Type mismatch for " & fd.name & " argument " & $i & ": expected " & $fd.argKinds[i] & ", got " & $k & "\n")
       return false
-
   return true
 
 # Find a matching function with the given name and argument types
 
-proc findFunc*(name: string, args: openArray[Node]=[]): Func =
+proc newCall*(name: string, args: seq[Node]): Node =
+  let sig = name & "(" & args.mapIt($it).join(", ") & ")"
   if name notin funcTable:
     raise newException(ValueError, "Unknown function: " & name)
   for fd in funcTable[name]:
     if fd.argsMatch(args):
-      return fd.factory()
-  let tmp = args.mapIt($it.kind).join(", ")
-  raise newException(ValueError, "No matching arguments found for " & name & "(" & tmp & ")")
+      return Node(kind: nkCall, fd: fd, fn: fd.factory(), args: args)
+  raise newException(ValueError, "No matching arguments found for " & sig)
 
 # Generate function with given name
 
@@ -117,6 +115,10 @@ def "repeat", [nkString, nkFloat], nkString:
 def "&", [nkString, nkString], nkString:
   return proc(vs: openArray[Node]): Node =
     newString vs[0].getString & vs[1].getString
+
+def "len", [nkString], nkFloat:
+  return proc(vs: openArray[Node]): Node =
+    newFloat vs[0].getString.len.float
 
 # Statistics
 

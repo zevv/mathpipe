@@ -42,23 +42,27 @@ const exprParser = peg(exprs, st: seq[Node]):
   number <- >numbers.number:
     st.add newFloat parseNumber($1)
 
-  variable <- {'$','%'} * >+Digit:
+  column <- '#' * >+Digit:
+    st.add Node(kind: nkVar, colIdx: parseInt($1))
+
+  variable <- '$' * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
-
-  call <- >functionName * ( "(" * args * ")" | args):
-    st[^1].fn = findFunc($1, st[^1].args)
-
-  functionName <- Alpha * *Alnum:
-    st.add Node(kind: nkCall)
 
   args <- *(arg * ?"," * S)
 
   arg <- exp:
     st[^2].args.add st.pop
 
+  functionName <- Alpha * *Alnum:
+    # temporary placeholder to collect arguments
+    st.add Node(kind: nkCall)
+
+  call <- >functionName * ( "(" * args * ")" | args):
+    # replace placeholder with full nkCall node
+    st[^1] = newCall($1, st[^1].args)
+
   uniMinus <- '-' * exp:
-    let args = @[st.pop]
-    st.add Node(kind: nkCall, fn: findFunc("neg", args), args: args)
+    st.add newCall("neg", @[st.pop])
 
   bool <- "true" | "false":
     st.add newBool($0 == "true")
@@ -78,7 +82,7 @@ const exprParser = peg(exprs, st: seq[Node]):
 
     let (a2, a1) = (st.pop, st.pop)
     let args = @[a1, a2]
-    st.add Node(kind: nkCall, fn: findFunc($1, args), args: args)
+    st.add newCall($1, args)
 
   exp <- S * atom * *binop * S
 

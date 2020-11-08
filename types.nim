@@ -1,13 +1,17 @@
 
 import strformat
+import sequtils
+import strutils
 
 type
 
   NodeKind* = enum
-    nkFloat, nkVar, nkCall, nkString, nkBool
+    nkVoid, nkFloat, nkVar, nkCall, nkString, nkBool
 
   Node* = ref object
     case kind*: NodeKind
+    of nkVoid:
+      discard
     of nkBool:
       vBool: bool
     of nkFloat:
@@ -22,7 +26,7 @@ type
       args*: seq[Node]
 
   Func* = proc(val: openArray[Node]): Node
-  
+
   FuncDesc* = object
     name*: string
     argKinds*: seq[NodeKind]
@@ -38,7 +42,6 @@ proc newString*(v: string): Node =
 
 proc newBool*(v: bool): Node =
   Node(kind: nkBool, vBool: v)
-
 
 proc getFloat*(n: Node): float =
   assert n.kind == nkFloat
@@ -58,8 +61,13 @@ proc getBool*(n: Node): bool =
   assert n.kind == nkBool
   n.vBool
 
+proc `$`*(fd: FuncDesc): string =
+  result = fd.name & "(" & fd.argKinds.mapit($it).join(", ") & "): " & $fd.retKind
+
 proc `$`*(n: Node): string =
   case n.kind:
+  of nkCall:
+    $n.fd
   of nkFloat:
     &"{n.vFloat:g}"
   of nkBool:
