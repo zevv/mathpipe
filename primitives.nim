@@ -217,7 +217,14 @@ def "histogram", [nkFloat, nkFloat], nkFloat:
     newFloat v
 
 
-proc makeTest(): func =
-  result = proc(a: float, b: string): float =
-    return 3
+import macros
+
+macro hop(n: untyped) =
+  echo n.treeRepr
+
+hop:
+  var t = 10.0
+  let x = proc(a: float, b: string): float =
+    t += a + b.len 
+    t
 
