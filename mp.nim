@@ -33,7 +33,7 @@ grammar numbers:
             fraction
 
 
-# Expression -> AST parser
+# Parse list of expressions into a seq of AST Nodes
 
 const exprParser = peg(exprs, st: seq[Node]):
 
@@ -61,8 +61,6 @@ const exprParser = peg(exprs, st: seq[Node]):
     # replace placeholder with full nkCall node
     st[^1] = newCall($1, st[^1].args)
 
-  uniMinus <- '-' * exp:
-    st.add newCall("neg", @[st.pop])
 
   bool <- "true" | "false":
     st.add newBool($0 == "true")
@@ -70,9 +68,12 @@ const exprParser = peg(exprs, st: seq[Node]):
   string <- '"' * >*(1 - '"') * '"':
     st.add newString $1
 
-  atom <- (variable | column | number | bool | string | call | parenExp | uniMinus) * S
+  atom <- (variable | column | number | bool | string | call | parenExp | uniop) * S
 
   parenExp <- ( "(" * exp * ")" )                                 ^   0
+  
+  uniop <- '-' * exp:
+    st.add newCall("neg", @[st.pop])
 
   binop <- >("|" | "or" | "xor")                            * exp ^   3 |
            >("&" | "and")                                   * exp ^   4 |
@@ -131,8 +132,13 @@ proc main() =
   for l in lines(stdin):
     let r = inputParser.match(l)
     if r.ok:
-      let vars = r.captures.mapIt(it.parseNumber)
-      let cols = l.splitWhitespace()
-      echo root.mapIt($it.eval(vars, cols)).join(" ")
+      try:
+        let vars = r.captures.mapIt(it.parseNumber)
+        let cols = l.splitWhitespace()
+        echo root.mapIt($it.eval(vars, cols)).join(" ")
+      except:
+        #stderr.write("warning: " & getCurrentExceptionMsg() & "\n")
+        discard
+
 
 main()

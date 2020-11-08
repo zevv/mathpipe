@@ -68,14 +68,12 @@ proc `$`*(fd: FuncDesc): string =
 
 proc `$`*(n: Node): string =
   case n.kind:
-  of nkCall:
-    $n.fd
-  of nkFloat:
-    &"{n.vFloat:g}"
-  of nkBool:
-    if n.vBool: "true" else: "false"
-  of nkString:
-    n.vString
+  of nkCall: $n.fd
+  of nkFloat: &"{n.vFloat:g}"
+  of nkBool: (if n.vBool: "true" else: "false")
+  of nkString: n.vString
+  of nkVar: "$" & $n.varIdx
+  of nkCol: "#" & $n.colIdx
   else: ""
 
 
