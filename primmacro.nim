@@ -4,6 +4,23 @@ import macros
 # This macro transforms and wraps a block of nim code with a proc which
 # will be available in the VM as a primitive function or operator
 #
+#   prim:
+#     var vPrev: float
+#     proc diff(v: float): float =
+#       result = v - vPrev
+#       vPrev = v
+#
+# will be transformed to:
+#
+#   funcTable.mgetOrPut("diff", @[]).add FuncDesc(name: "diff",
+#      argKinds: @[nkfloat], retKind: nkfloat, factory: proc (): Func =
+#    var vPrev: float
+#    let aux = proc (v: float): float =
+#      result = v - vPrev
+#      vPrev = v
+#    return proc (vs: openArray[Node]): Node =
+#      aux(vs[0].getfloat).toNode)
+
 
 macro prim*(n: untyped) =
   let body = newStmtList()
@@ -42,9 +59,6 @@ macro prim*(n: untyped) =
         let `wrapper` = `lambda`
         return proc(`vs`: openArray[Node]): Node =
           `wrapcall`.toNode
-     
-  
-  #echo body.repr
 
   quote do:
     funcTable.mgetOrPut(`name`, @[]).add FuncDesc(
