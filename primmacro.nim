@@ -1,5 +1,10 @@
 import macros
 
+#
+# This macro transforms and wraps a block of nim code with a proc which
+# will be available in the VM as a primitive function or operator
+#
+
 macro prim*(n: untyped) =
   let body = newStmtList()
   var name: NimNode
@@ -15,7 +20,9 @@ macro prim*(n: untyped) =
     return ident("nk" & name)
 
   for i, nc in n:
-    if i == n.len-1:
+    if i < n.len-1:
+      body.add nc
+    else:
       nc.expectKind nnkProcDef
       if nc[0].kind == nnkAccQuoted:
         name = newLit(nc[0][0].strVal)
@@ -36,17 +43,13 @@ macro prim*(n: untyped) =
         return proc(`vs`: openArray[Node]): Node =
           `wrapcall`.toNode
      
-    else:
-      body.add nc
-      discard
+  
+  #echo body.repr
 
-  let res = quote do:
+  quote do:
     funcTable.mgetOrPut(`name`, @[]).add FuncDesc(
       name: `name`,
       argKinds: @`argKinds`,
       retKind: `retKind`,
       factory: proc(): Func = `body`
     )
-
-  #echo res.repr
-  res
