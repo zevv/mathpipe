@@ -1,6 +1,7 @@
 
 import strformat
 import sequtils
+import math
 import strutils
 
 type
@@ -72,7 +73,13 @@ proc `$`*(fd: FuncDesc): string =
 proc `$`*(n: Node): string =
   case n.kind:
   of nkCall: $n.fd
-  of nkFloat: &"{n.vFloat:g}"
+  of nkFloat:
+    let vFloat = n.vFloat
+    let vInt = vFloat.int
+    if vFloat == vInt.float:
+      $vInt
+    else:
+      $vFloat
   of nkBool: (if n.vBool: "true" else: "false")
   of nkString: n.vString.escape
   of nkVar: "$" & $n.varIdx
