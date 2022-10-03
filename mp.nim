@@ -47,7 +47,7 @@ const exprParser = peg(exprs, st: seq[Node]):
   column <- '#' * >+Digit:
     st.add Node(kind: nkCol, colIdx: parseInt($1))
 
-  variable <- '$' * >+Digit:
+  variable <- ('$' | '%') * >+Digit:
     st.add Node(kind: nkVar, varIdx: parseInt($1))
 
   args <- *(arg * ?"," * S)

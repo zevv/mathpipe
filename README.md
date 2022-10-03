@@ -54,6 +54,7 @@ as integers.
 ### Utilities
 
 - `histogram(val)`: Render ASCII historgram of input data
+- `histogram(val, width)`: As above, but set width to `width` * stddev
 
 ### Logarithms
 
