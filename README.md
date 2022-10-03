@@ -53,7 +53,7 @@ as integers.
 
 ### Generators
 
-- count()
+- count([stepsize])
 - rand([min [, max]])
 - gauss([mu [, sigma]])
 

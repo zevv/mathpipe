@@ -43,7 +43,7 @@ proc drawHistogram*(vals: openArray[float], width=2.0, log=false) =
 
   let
     w = terminalWidth() - 10
-    h = terminalHeight() - 3
+    h = terminalHeight() - 2
     median = 0.5 * (vals[vals.high div 2] + vals[vals.len div 2])
     stddev = vals.standardDeviation
     bins = min(vals.len, h)
@@ -59,8 +59,8 @@ proc drawHistogram*(vals: openArray[float], width=2.0, log=false) =
     if idx >= 0 and idx < bin.len:
       bin[idx] += 1
       binMax = max(binMax, bin[idx])
-  echo "\e[H"
+  stdout.write("\e[H\e[K")
   for i, b in bin:
     let binavg = min + (i.float + 0.5) * binsize
     let l = int(w.float * b / binMax)
-    echo siFmt(binAvg, true) & " [" & repeat("■", l) & repeat(" ", w-l) & "]"
+    echo siFmt(binAvg, true) & " |" & repeat("■", l) & "\e[K"
