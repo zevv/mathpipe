@@ -28,9 +28,11 @@ grammar numbers:
 
   fraction <- '.' * +Digit * ?exponent
 
-  number <- '0' * ({'x','X'} * Xdigit | ?fraction) |
+  number <- ?'-' * (
+            '0' * ({'x','X'} * Xdigit | ?fraction) |
             {'1'..'9'} * *Digit * ?fraction |
             fraction
+          )
 
 
 # Parse list of expressions into a seq of AST Nodes

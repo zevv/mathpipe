@@ -4,6 +4,7 @@ import math
 import sequtils
 import stats
 import macros
+import algorithm
 
 import biquad
 import histogram
@@ -144,6 +145,13 @@ prim:
     vtot / n
 
 prim:
+  var vs: seq[float]
+  proc median(v: float): float =
+    vs.add(v)
+    sort(vs, system.cmp[float])
+    0.5 * (vs[vs.high div 2] + vs[vs.len div 2])
+
+prim:
   var rs: RunningStat
   proc variance(v: float): float =
     rs.push(v)
@@ -193,12 +201,31 @@ prim:
     biquad.config(BiquadLowpass, alpha, Q)
     biquad.run(v)
 
+prim:
+  var biquad = initBiquad(BiquadHighpass, 0.1)
+  proc highpass(v: float): float =
+    biquad.config(BiquadHighpass, 0.1, 0.707)
+    biquad.run(v)
+
+prim:
+  var biquad = initBiquad(BiquadHighpass, 0.1)
+  proc highpass(v: float, alpha: float): float =
+    biquad.config(BiquadHighpass, alpha, 0.707)
+    biquad.run(v)
+
+prim:
+  var biquad = initBiquad(BiquadHighpass, 0.1)
+  proc highpass(v: float, alpha: float, Q: float): float =
+    biquad.config(BiquadHighpass, alpha, Q)
+    biquad.run(v)
+
 # Utilities
 
 prim:
   var vals: seq[float]
   proc histogram(v: float): float =
     vals.add v
+    sort(vals, system.cmp[float])
     drawHistogram(vals)
     v
 
@@ -206,6 +233,7 @@ prim:
   var vals: seq[float]
   proc histogram(v: float, width: float): float =
     vals.add v
+    sort(vals, system.cmp[float])
     drawHistogram(vals, width)
     v
 
