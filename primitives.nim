@@ -149,8 +149,14 @@ prim:
 
 prim:
   var n = 0.0
-  proc count(v: float): float =
+  proc count(): float =
     n += 1.0
+    n
+
+prim:
+  var n = 0.0
+  proc count(dn: float): float =
+    n += dn
     n
 
 prim:

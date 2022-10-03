@@ -51,8 +51,9 @@ as integers.
 - `x or y` / `x | y`: Binary or
 - `x xor y`: Binary xor
 
-### Random and noise
+### Generators
 
+- count()
 - rand([min [, max]])
 - gauss([mu [, sigma]])
 

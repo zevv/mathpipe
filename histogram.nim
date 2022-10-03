@@ -10,7 +10,7 @@ proc siFmt*(v: SomeNumber, align=false): string =
   let f = abs(v.float)
 
   proc format(s: float, suffix: string): string =
-    var fs = &"{f*s:.4g}"
+    var fs = ($f)[0..4]
     #fs.trimZeros()
     #if align:
     #  fs = fs.align(5)
