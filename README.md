@@ -51,6 +51,11 @@ as integers.
 - `x or y` / `x | y`: Binary or
 - `x xor y`: Binary xor
 
+### Random and noise
+
+- rand([min [, max]])
+- gauss([mu [, sigma]])
+
 ### Utilities
 
 - `histogram(val)`: Render ASCII historgram of input data

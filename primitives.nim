@@ -1,6 +1,7 @@
 import tables
 import strutils
 import math
+import random
 import sequtils
 import stats
 import macros
@@ -104,6 +105,33 @@ defUniOp "arctan", arctan
 defBinOp "atan2", arctan2
 defBinOp "arctan2", arctan2
 defBinOp "hypot",  hypot
+
+# Random and noise
+
+prim:
+  proc rand(): float = 
+    rand(1.0)
+
+prim:
+  proc rand(max: float): float = 
+    rand(max)
+
+prim:
+  proc rand(min: float, max: float): float = 
+    rand(max-min) + min
+
+
+prim:
+  proc gauss(): float = 
+    gauss(1.0)
+
+prim:
+  proc gauss(mu: float): float = 
+    gauss(mu)
+
+prim:
+  proc gauss(mu: float, sigma: float): float = 
+    gauss(mu, sigma)
 
 # String
 

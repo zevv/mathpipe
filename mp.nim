@@ -3,6 +3,7 @@ import npeg
 import tables
 import strutils
 import math
+import random
 import os
 import sequtils
 import strformat
@@ -111,6 +112,8 @@ proc eval(n: Node, args: seq[float], cols: seq[string]): Node =
 # Main code
 
 proc main() =
+
+  randomize()
 
   # Parse all expressions from the command line
 
